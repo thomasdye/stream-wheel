@@ -77,6 +77,6 @@ The Wheel Dashboard application is a web-based tool designed for managing weight
 1. Clone the repository:
    ```bash
    git clone https://github.com/thomasdye/stream-wheel.git
-   cd wheel-dashboard
+   cd stream-wheel
    pip install -r requirements.txt
    python app.py
