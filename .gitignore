@@ -50,6 +50,8 @@ Thumbs.db
 *.svg
 *.txt
 
+!requirements.txt
+
 # Python egg files
 *.egg
 *.egg-info/
