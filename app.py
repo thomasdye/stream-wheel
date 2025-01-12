@@ -225,8 +225,17 @@ def dashboard():
         for entry in entries
     ]
     spin_history = SpinHistory.query.order_by(SpinHistory.timestamp.desc()).limit(10).all()
-    return render_template('dashboard.html', entries=entry_data, spin_history=spin_history)
-
+    history_data = [
+        {
+            'result': spin.result,
+            'timestamp': f"{spin.timestamp.strftime('%m').lstrip('0')}/"
+                         f"{spin.timestamp.strftime('%d').lstrip('0')}/"
+                         f"{spin.timestamp.strftime('%y')} - "
+                         f"{spin.timestamp.strftime('%I').lstrip('0')}:{spin.timestamp.strftime('%M%p')}"
+        }
+        for spin in spin_history
+    ]
+    return render_template('dashboard.html', entries=entry_data, spin_history=history_data)
 
 @app.route('/wheel')
 def wheel():

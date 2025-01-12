@@ -19,8 +19,8 @@
                 <ul>
                     {% for entry in entries %}
                     <li>
-                        <span>{{ entry.name }}</span>
-                        <span>{{ entry.weight }}</span>
+                        <span>{{ entry.name }} </span>
+                        <span>{{ "%.2f" | format(entry.chance) }}%</span>
                     </li>
                     {% endfor %}
                 </ul>

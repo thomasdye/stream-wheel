@@ -40,8 +40,32 @@ main {
     background-color: #1e1e1e;
     padding: 20px;
     border-radius: 10px;
-    width: 300px;
+    width: 450px;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    max-height: 50vh;
+    overflow-y: auto;
+}
+
+#key-section::-webkit-scrollbar,
+#result-section::-webkit-scrollbar {
+    width: 6px;
+}
+
+#key-section::-webkit-scrollbar-track,
+#result-section::-webkit-scrollbar-track {
+    background: #2e2e2e;
+    border-radius: 10px;
+}
+
+#key-section::-webkit-scrollbar-thumb,
+#result-section::-webkit-scrollbar-thumb {
+    background: #555555;
+    border-radius: 10px;
+}
+
+#key-section::-webkit-scrollbar-thumb:hover,
+#result-section::-webkit-scrollbar-thumb:hover {
+    background: #777777;
 }
 
 h2 {
@@ -60,9 +84,17 @@ li {
     display: flex;
     justify-content: space-between;
     margin-bottom: 10px;
-    padding: 10px;
+    padding: 5px 20px;
     background-color: #2e2e2e;
     border-radius: 5px;
+    word-break: break-word;
+    width: 400px;
+    height: 50px;
+    box-sizing: border-box;
+}
+
+li span {
+    font-size: 18px;
 }
 
 #trigger-section {
