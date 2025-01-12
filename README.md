@@ -78,5 +78,5 @@ The Wheel Dashboard application is a web-based tool designed for managing weight
    ```bash
    git clone https://github.com/your-username/wheel-dashboard.git
    cd wheel-dashboard
-pip install -r requirements.txt
-python app.py
+   pip install -r requirements.txt
+   python app.py
