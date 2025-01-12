@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spin the Wheel</title>
+    <link rel="stylesheet" href="static/css/wheel.css">
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+</head>
+<body>
+    <div id="username-modal" class="modal {% if not require_username %}hidden{% endif %}">
+        <div class="modal-content">
+            <h2>Set Your Twitch Username</h2>
+            <form id="username-form">
+                <input type="text" id="username-input" name="username" maxlength="20" placeholder="Enter Twitch Username" required>
+                <button type="submit">Save</button>
+            </form>
+            <p id="error-message" style="color: red; display: none;"></p>
+        </div>
+    </div>
+
+    <div id="no-entries-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2>No Entries Available</h2>
+            <p>Please add entries to spin the wheel.</p>
+            <button onclick="redirectToManage()">Go to Manage Entries</button>
+        </div>
+    </div>
+
+    <div id="result-modal">
+        <div id="result-content">
+            <h2 id="modal-title"></h2>
+            <p id="modal-description"></p> 
+            <p id="modal-chance"></p>
+        </div>
+    </div>
+
+    <div id="main-container">
+        <div id="key">
+            <h2>Key</h2>
+            <ul id="key-list"></ul>
+        </div>
+        <div id="center-container">
+            <h1>{{ twitch_username }}'s Wheel</h1>
+            <div id="wheel-container">
+                <div id="indicator"></div>
+                <canvas id="wheel" width="800" height="800"></canvas>
+            </div>
+            <button id="spin-btn" onclick="triggerSpin()">Spin</button>
+        </div>
+        <div id="spin-history">
+            <h2>Spin History</h2>
+            <ul id="spin-history-list"></ul>
+        </div>
+    </div>
+
+    <div id="inactivity-overlay" data-color="{{ green_screen_color | default('#00FF00') }}"></div>
+
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="static/js/wheel.js"></script>
+</body>
+</html>

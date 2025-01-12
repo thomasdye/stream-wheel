@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="static/css/dashboard.css">
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="static/js/dashboard.js" defer></script>
+</head>
+<body>
+    <header>
+        <h1>Wheel Dashboard</h1>
+    </header>
+    <main>
+        <div id="key-and-result-container">
+            <section id="key-section">
+                <h2>Entries</h2>
+                <ul>
+                    {% for entry in entries %}
+                    <li>
+                        <span>{{ entry.name }}</span>
+                        <span>{{ entry.weight }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </section>
+            <section id="result-section">
+                <h2>Result</h2>
+                <ul>
+                    {% for spin in spin_history %}
+                    <li>
+                        <span>{{ spin.result }}</span>
+                        <span>{{ spin.timestamp }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </section>
+        </div>
+        <div id="trigger-section">
+            <button id="trigger-spin-btn">Trigger Spin</button>
+            <div id="action-links">
+                <a href="/manage">Manage Entries</a>
+                <a href="/settings">Settings</a>
+            </div>
+        </div>
+    </main>
+</body>
+</html>

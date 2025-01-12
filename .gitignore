@@ -1,0 +1,64 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+.env/
+
+# Flask/Environment Variables
+*.env
+*.flaskenv
+
+# SQLite database files
+*.db
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# Static files cache
+staticfiles/
+*.css.map
+*.js.map
+
+# Ignore all files in /custom_scripts/
+custom_scripts/*
+
+# But keep the directory itself
+!custom_scripts/.gitkeep
+
+# Node.js dependencies (if using npm/yarn)
+node_modules/
+
+# VSCode settings
+.vscode/
+
+# macOS files
+.DS_Store
+
+# Thumbnails
+Thumbs.db
+
+# Generated assets
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.txt
+
+# Python egg files
+*.egg
+*.egg-info/
+dist/
+build/
+*.tar.gz
+*.whl
+
+# Local testing files
+*.bak
+*.swp
+*.tmp

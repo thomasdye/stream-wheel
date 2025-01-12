@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings</title>
+    <link rel="stylesheet" href="static/css/settings.css">
+</head>
+<body>
+    <div id="settings-container">
+        <h2>Settings</h2>
+        <form method="POST" action="/settings">
+            <label for="setting_value">Twitch Username</label>
+            <input
+                type="text"
+                id="setting_value"
+                name="setting_value"
+                value="{{ current_value }}"
+                maxlength="20"
+                required
+            >
+            <label for="green_screen_color">Green Screen Color</label>
+            <input
+                type="color"
+                id="green_screen_color"
+                name="green_screen_color"
+                value="{{ green_screen_color }}"
+            >
+            <label for="sub_count" class="sub-count-label">Required Subscribers</label>
+            <input
+                type="number"
+                id="sub_count"
+                name="sub_count"
+                class="styled-input"
+                value="{{ sub_count if sub_count else 3 }}"
+                min="1"
+                required
+            >
+            <button type="submit">Save Settings</button>
+        </form>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="toast">
+                {% for category, message in messages %}
+                    <p>{{ message }}</p>
+                {% endfor %}
+            </div>
+        {% endif %}
+        {% endwith %}
+        <a href="/">Back to Dashboard</a>
+    </div>
+</body>
+</html>
