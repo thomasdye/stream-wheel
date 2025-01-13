@@ -98,8 +98,20 @@ The Wheel Dashboard application is a web-based tool designed for managing weight
 - Press **OK**.
 
 - Open **Advanced Audio Properties** by clicking the three vertical dots in the **Audio Mixer** section for the Wheel.
-  - Under **Audio Monitoring** for the Wheel source, change "Monitor Off" to "Monitor and Output."
-  - Close the window to save changes.
+  - Under **Audio Monitoring** for the Wheel source, change "Monitor Off" to "Monitor and Output.
 
 - Open your browser and navigate to: `http://localhost:5000`.
   - This is your dashboard, where you can manage the wheel and its settings.
+  - Add, Edit, and Delete Entries under **Manage Entries**
+  - Change Twitch Username, Chroma Key Inactivity Color, Required Subs and Sounds (**add .mp3 or .wav files to the /custom_sounds/ directory**) under **Settings**
+
+  - How To Chroma Key The Wheel Out
+    - Right click on the Wheel source
+    - Select 'Filters'
+    - Press '+' under Effect Filters
+    - Select 'Chroma Key'
+    - Press 'OK'
+    - Select 'Custom Color'
+    - Change 'Similarity' to 1
+    - Press 'Close'
+  
