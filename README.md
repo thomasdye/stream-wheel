@@ -80,3 +80,26 @@ The Wheel Dashboard application is a web-based tool designed for managing weight
    cd stream-wheel
    pip install -r requirements.txt
    python app.py
+- Open OBS and add a new **Browser Source**.
+- Configure the Browser Source as follows:
+  - **Name:** Use any name you prefer (e.g., "Wheel").
+  - **URL:** `http://localhost:5000/wheel`
+  - **Width:** `1920`
+  - **Height:** `1080`
+  - **Control Audio via OBS:** Check this box.
+  - **Custom CSS:** Use the following:
+    ```css
+    body {
+        background-color: rgba(0, 0, 0, 0);
+        margin: 0px auto;
+        overflow: hidden;
+    }
+    ```
+- Press **OK**.
+
+- Open **Advanced Audio Properties** by clicking the three vertical dots in the **Audio Mixer** section for the Wheel.
+  - Under **Audio Monitoring** for the Wheel source, change "Monitor Off" to "Monitor and Output."
+  - Close the window to save changes.
+
+- Open your browser and navigate to: `http://localhost:5000`.
+  - This is your dashboard, where you can manage the wheel and its settings.
