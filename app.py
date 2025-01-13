@@ -1,3 +1,6 @@
+import eventlet
+eventlet.monkey_patch()
+
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_socketio import SocketIO, emit
@@ -7,6 +10,10 @@ import subprocess
 import irc.client
 import threading
 import random
+from eventlet import wsgi
+
+# Patch eventlet to work with subprocess
+
 
 app = Flask(__name__)
 app.secret_key = "thissecretkeyisonlyrequiredforflashingmessages"
@@ -590,4 +597,4 @@ with app.app_context():
 
 if __name__ == '__main__':
     threading.Thread(target=connect_to_twitch_chat, daemon=True).start()
-    socketio.run(app, debug=False, allow_unsafe_werkzeug=True)
+    socketio.run(app, host='0.0.0.0', port=5000)
