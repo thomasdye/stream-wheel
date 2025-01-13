@@ -590,4 +590,4 @@ with app.app_context():
 
 if __name__ == '__main__':
     threading.Thread(target=connect_to_twitch_chat, daemon=True).start()
-    socketio.run(app, debug=False)
+    socketio.run(app, debug=False, allow_unsafe_werkzeug=True)
