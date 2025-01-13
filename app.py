@@ -293,7 +293,7 @@ def settings():
         value = request.form.get('setting_value', '').strip()
         green_screen_color = request.form.get('green_screen_color', '#00FF00').strip()
         sub_count = request.form.get('sub_count', type=int)
-        selected_sound = request.form.get('sound', '').strip()
+        selected_sound = request.form.get('sound', '').strip() or None
 
         if not value:
             flash("Twitch Username cannot be empty", "error")
@@ -311,7 +311,7 @@ def settings():
             setting.value = value
             setting.green_screen_color = green_screen_color
             setting.sub_count = sub_count
-            setting.sound = selected_sound  # Save the selected sound
+            setting.sound = selected_sound
         else:
             setting = Settings(
                 value=value, 

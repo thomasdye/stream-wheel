@@ -20,15 +20,23 @@ const canvas = document.getElementById('wheel');
         socket.on("trigger_spin", () => {
             console.log("Spin triggered from the dashboard!");
         
-            const soundUrl = document.getElementById("spin-sound").src; // Assuming spin-sound element exists
-            if (!spinSound) {
-                spinSound = new Audio(soundUrl);
+            // Play the selected sound if it's not "None"
+            const spinSoundElement = document.getElementById("spin-sound");
+            if (spinSoundElement && spinSoundElement.src) {
+                const soundUrl = spinSoundElement.src;
+        
+                // Initialize the sound only if it's a valid sound
+                if (soundUrl) {
+                    if (!spinSound) {
+                        spinSound = new Audio(soundUrl);
+                    }
+                    spinSound.play().catch((error) => {
+                        console.error("Error playing spin sound:", error);
+                    });
+                }
             }
         
-            spinSound.play().catch((error) => {
-                console.error("Error playing spin sound:", error);
-            });
-        
+            // Trigger the spin logic (if not already spinning)
             if (!spinning) {
                 resetInactivityTimer();
                 spinWheel();

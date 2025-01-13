@@ -38,6 +38,7 @@
             >
             <label for="sound">Sound</label>
             <select id="sound" name="sound" class="styled-input">
+                <option value="" {% if not selected_sound %}selected{% endif %}>None</option>
                 {% for sound in sounds %}
                     <option value="{{ sound }}" {% if sound == selected_sound %}selected{% endif %}>
                         {{ sound }}

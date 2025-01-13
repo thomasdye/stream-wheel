@@ -19,33 +19,33 @@ body {
 }
 
 input[type="text"], input[type="number"], input[type="color"] {
-    width: 50%; /* Uniform width for all input elements */
+    width: 50%;
     padding: 10px;
     margin: 10px auto;
     border: 1px solid #333;
     border-radius: 5px;
     background-color: #2e2e2e;
     color: #fff;
-    text-align: center; /* Center-align the input text */
-    display: block; /* Center the element horizontally */
-    box-sizing: border-box; /* Ensures padding and borders are included in width */
+    text-align: center;
+    display: block;
+    box-sizing: border-box;
 }
 
 input[type="number"] {
-    -webkit-appearance: none; /* For WebKit browsers (Chrome, Safari, Edge) */
-    -moz-appearance: textfield; /* For Firefox */
-    appearance: none; /* Standard property */
+    -webkit-appearance: none;
+    -moz-appearance: textfield;
+    appearance: none;
 }
 
 input[type="number"]::-webkit-inner-spin-button, 
 input[type="number"]::-webkit-outer-spin-button {
-    -webkit-appearance: none; /* Remove arrows in WebKit browsers */
-    margin: 0; /* Prevent extra margin */
+    -webkit-appearance: none;
+    margin: 0;
 }
 
 input[type="color"] {
-    height: 50px; /* Adjusted height to match previous styling */
-    cursor: pointer; /* Makes it clear the color picker is interactive */
+    height: 50px;
+    cursor: pointer;
 }
 
 button {
@@ -56,11 +56,37 @@ button {
     border-radius: 5px;
     cursor: pointer;
     display: block;
-    margin: 20px auto 0 auto; /* Increased margin above the button */
+    margin: 20px auto 0 auto;
 }
 
 button:hover {
     background-color: #0056b3;
+}
+
+select.styled-input {
+    width: 50%;
+    padding: 10px;
+    margin: 10px auto;
+    border: 1px solid #333;
+    border-radius: 5px;
+    background-color: #2e2e2e;
+    color: #fff;
+    text-align: center;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    cursor: pointer;
+    display: block;
+}
+
+select.styled-input option {
+    background-color: #1e1e1e;
+    color: #fff;
+}
+
+select.styled-input:focus {
+    outline: none;
+    border: 1px solid #007bff;
 }
 
 .toast {
@@ -86,7 +112,7 @@ a:hover {
     display: block;
     margin: 20px auto 10px auto;
     font-size: 16px;
-    text-align: center; /* Center-align the label text */
+    text-align: center;
 }
 
 label {
