@@ -586,6 +586,7 @@ with app.app_context():
     setting = Settings.query.first()
     sub_count = setting.sub_count if setting else 3
     socketio.emit("sub_count_updated", {"current_subs": total_subs, "total_subs": sub_count})
+    print(f"Emitted sub_count_updated: {total_subs} / {sub_count}")
 
 if __name__ == '__main__':
     threading.Thread(target=connect_to_twitch_chat, daemon=True).start()

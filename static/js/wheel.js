@@ -413,6 +413,7 @@ const canvas = document.getElementById('wheel');
         });
 
         socket.on("sub_count_updated", (data) => {
+            console.log("Received sub_count_updated:", data);
             const subCountElement = document.getElementById("sub-count-display");
             if (subCountElement) {
                 subCountElement.textContent = `${data.current_subs} / ${data.total_subs}`;
