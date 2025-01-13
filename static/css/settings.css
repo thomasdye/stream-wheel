@@ -8,6 +8,7 @@ body {
     height: 100vh;
     margin: 0;
 }
+
 #settings-container {
     background-color: #1e1e1e;
     padding: 20px;
@@ -16,6 +17,7 @@ body {
     text-align: center;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
 }
+
 input[type="text"], input[type="number"], input[type="color"] {
     width: 50%; /* Uniform width for all input elements */
     padding: 10px;
@@ -28,20 +30,24 @@ input[type="text"], input[type="number"], input[type="color"] {
     display: block; /* Center the element horizontally */
     box-sizing: border-box; /* Ensures padding and borders are included in width */
 }
+
 input[type="number"] {
     -webkit-appearance: none; /* For WebKit browsers (Chrome, Safari, Edge) */
     -moz-appearance: textfield; /* For Firefox */
     appearance: none; /* Standard property */
 }
+
 input[type="number"]::-webkit-inner-spin-button, 
 input[type="number"]::-webkit-outer-spin-button {
     -webkit-appearance: none; /* Remove arrows in WebKit browsers */
     margin: 0; /* Prevent extra margin */
 }
+
 input[type="color"] {
     height: 50px; /* Adjusted height to match previous styling */
     cursor: pointer; /* Makes it clear the color picker is interactive */
 }
+
 button {
     background-color: #007bff;
     color: white;
@@ -52,9 +58,11 @@ button {
     display: block;
     margin: 20px auto 0 auto; /* Increased margin above the button */
 }
+
 button:hover {
     background-color: #0056b3;
 }
+
 .toast {
     background-color: #333;
     color: white;
@@ -62,18 +70,36 @@ button:hover {
     border-radius: 5px;
     margin-top: 15px;
 }
+
 a {
     display: inline-block;
     margin-top: 20px;
     color: #007bff;
     text-decoration: none;
 }
+
 a:hover {
     color: #0056b3;
 }
+
 .color-picker-label, .sub-count-label {
     display: block;
     margin: 20px auto 10px auto;
     font-size: 16px;
     text-align: center; /* Center-align the label text */
+}
+
+label {
+    display: block;
+    margin: 10px 0 5px;
+    font-weight: bold;
+}
+
+.styled-input {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 20px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 16px;
 }

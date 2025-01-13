@@ -27,6 +27,21 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
+    document.addEventListener("DOMContentLoaded", () => {
+        const fakeButton = document.createElement("button");
+        fakeButton.style.display = "none";
+        document.body.appendChild(fakeButton);
+    
+        try {
+            fakeButton.click();
+            console.log("Simulated interaction to enable audio playback.");
+        } catch (error) {
+            console.error("Failed to simulate interaction:", error);
+        } finally {
+            document.body.removeChild(fakeButton);
+        }
+    });
+
     scriptDropdowns.forEach((dropdown) => {
         dropdown.addEventListener("change", () => {
             const entryId = dropdown.dataset.id;

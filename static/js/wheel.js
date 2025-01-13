@@ -9,6 +9,7 @@ const canvas = document.getElementById('wheel');
         let currentAngle = 0;
         let spinVelocity = 0;
         let inactivityTimeout;
+        let spinSound;
     
         const socket = io();
 
@@ -17,7 +18,17 @@ const canvas = document.getElementById('wheel');
         });
 
         socket.on("trigger_spin", () => {
-            console.log("Spin triggered from the dashboard!"); // Debug log
+            console.log("Spin triggered from the dashboard!");
+        
+            const soundUrl = document.getElementById("spin-sound").src; // Assuming spin-sound element exists
+            if (!spinSound) {
+                spinSound = new Audio(soundUrl);
+            }
+        
+            spinSound.play().catch((error) => {
+                console.error("Error playing spin sound:", error);
+            });
+        
             if (!spinning) {
                 resetInactivityTimer();
                 spinWheel();
@@ -334,6 +345,12 @@ const canvas = document.getElementById('wheel');
             // Hide modal after 10 seconds and notify all clients
             setTimeout(() => {
                 modal.classList.remove("show");
+        
+                // Stop the spin sound when the modal closes
+                if (spinSound) {
+                    spinSound.pause();
+                    spinSound.currentTime = 0; // Reset to the beginning
+                }
         
                 // Emit spin completed event
                 socket.emit("spin_completed", {

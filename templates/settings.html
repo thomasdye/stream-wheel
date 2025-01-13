@@ -36,6 +36,14 @@
                 min="1"
                 required
             >
+            <label for="sound">Sound</label>
+            <select id="sound" name="sound" class="styled-input">
+                {% for sound in sounds %}
+                    <option value="{{ sound }}" {% if sound == selected_sound %}selected{% endif %}>
+                        {{ sound }}
+                    </option>
+                {% endfor %}
+            </select>
             <button type="submit">Save Settings</button>
         </form>
         {% with messages = get_flashed_messages(with_categories=true) %}

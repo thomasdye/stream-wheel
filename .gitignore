@@ -49,6 +49,8 @@ Thumbs.db
 *.gif
 *.svg
 *.txt
+*.mp3
+*.wav
 
 !requirements.txt
 

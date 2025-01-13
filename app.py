@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, jsonify, flash
+from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_socketio import SocketIO, emit
 from datetime import datetime
@@ -35,6 +35,7 @@ class Settings(db.Model):
     value = db.Column(db.String(20), nullable=False)
     green_screen_color = db.Column(db.String(7), default="#00FF00")
     sub_count = db.Column(db.Integer, default=3)
+    sound = db.Column(db.String(100), nullable=True)
 
 class SpinHistory(db.Model):
     __bind_key__ = 'spin_history'
@@ -231,6 +232,13 @@ def execute_script(script_name):
     else:
         print(f"Script {script_name} not found!")
 
+def get_sounds():
+    """Fetch all .mp3 and .wav files from the /custom_sounds/ directory."""
+    sound_dir = os.path.join(os.getcwd(), "custom_sounds")
+    if not os.path.exists(sound_dir):
+        os.makedirs(sound_dir)
+    return [f for f in os.listdir(sound_dir) if f.endswith((".mp3", ".wav"))]
+
 @app.route('/')
 def dashboard():
     """Render the dashboard page."""
@@ -261,14 +269,20 @@ def wheel():
     """Render the wheel page."""
     global twitch_username
 
+    # Fetch settings
     setting = Settings.query.first()
     green_screen_color = setting.green_screen_color if setting else "#00FF00"
+    selected_sound = setting.sound if setting and setting.sound else None
+
+    # Fetch entries
     entries = Entry.query.all()
+
     return render_template(
         'wheel.html',
         entries=entries,
         twitch_username=twitch_username,
-        green_screen_color=green_screen_color
+        green_screen_color=green_screen_color,
+        selected_sound=selected_sound  # Pass selected sound
     )
 
 @app.route('/settings', methods=['GET', 'POST'])
@@ -279,6 +293,7 @@ def settings():
         value = request.form.get('setting_value', '').strip()
         green_screen_color = request.form.get('green_screen_color', '#00FF00').strip()
         sub_count = request.form.get('sub_count', type=int)
+        selected_sound = request.form.get('sound', '').strip()
 
         if not value:
             flash("Twitch Username cannot be empty", "error")
@@ -295,17 +310,18 @@ def settings():
         if setting:
             setting.value = value
             setting.green_screen_color = green_screen_color
-            setting.sub_count = sub_count  # Save sub count
+            setting.sub_count = sub_count
+            setting.sound = selected_sound  # Save the selected sound
         else:
-            setting = Settings(value=value, green_screen_color=green_screen_color, sub_count=sub_count)
+            setting = Settings(
+                value=value, 
+                green_screen_color=green_screen_color, 
+                sub_count=sub_count, 
+                sound=selected_sound
+            )
             db.session.add(setting)
 
         db.session.commit()
-
-        # Update the Twitch username and reconnect to Twitch chat
-        if value != twitch_username:
-            twitch_username = value
-            reconnect_to_twitch_chat()
 
         # Emit a WebSocket event to notify clients of the update
         socketio.emit("settings_updated")
@@ -318,7 +334,24 @@ def settings():
     current_value = setting.value if setting else ""
     green_screen_color = setting.green_screen_color if setting else "#00FF00"
     sub_count = setting.sub_count if setting else 3
-    return render_template('settings.html', current_value=current_value, green_screen_color=green_screen_color, sub_count=sub_count)
+    selected_sound = setting.sound if setting and setting.sound else None
+
+    # Check if the selected sound still exists
+    sounds = get_sounds()  # Fetch available sound files
+    if selected_sound and selected_sound not in sounds:
+        selected_sound = None  # Reset the sound if it no longer exists
+        if setting:
+            setting.sound = None
+            db.session.commit()
+
+    return render_template(
+        'settings.html', 
+        current_value=current_value, 
+        green_screen_color=green_screen_color, 
+        sub_count=sub_count, 
+        sounds=sounds, 
+        selected_sound=selected_sound
+    )
 
 @app.route('/manage', methods=['GET', 'POST'])
 def manage():
@@ -453,6 +486,11 @@ def update_script(entry_id):
     db.session.commit()
 
     return jsonify({"message": "Script updated successfully"}), 200
+
+@app.route('/custom_sounds/<path:filename>')
+def custom_sounds(filename):
+    sound_dir = os.path.join(os.getcwd(), "custom_sounds")
+    return send_from_directory(sound_dir, filename)
 
 @app.route('/sub_count', methods=['GET'])
 def sub_count():
