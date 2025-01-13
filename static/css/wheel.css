@@ -36,7 +36,7 @@ body {
     max-height: 80vh;
     overflow-y: auto;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
+}   
 
 #key::-webkit-scrollbar,
 #spin-history::-webkit-scrollbar {
@@ -107,6 +107,7 @@ body {
     flex-direction: column;
     align-items: center;
     text-align: center;
+    padding: 40px;
 }
 
 canvas {
@@ -177,6 +178,46 @@ canvas {
     border-radius: 10px;
     color: #ffffff;
     transition: background-color 0.3s ease;
+}
+
+#sub-count-display {
+    position: fixed;
+    bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 72px;
+    font-weight: bold;
+    text-align: center;
+}
+
+#sub-count-container {
+    position: fixed;
+    bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+#sub-count-container p {
+    margin: 0;
+}
+
+#sub-count-container .label {
+    font-size: 24px;
+    font-weight: bold;
+    color: #ffffff;
+    margin-bottom: 8px;
+}
+
+#sub-count-container .count {
+    font-size: 72px;
+    font-weight: bold;
+    color: #ffffff;
+    white-space: nowrap;
 }
 
 #modal-title {

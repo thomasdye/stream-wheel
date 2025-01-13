@@ -53,8 +53,9 @@
         </div>
     </div>
 
-    <div id="sub-count-display" style="position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%); font-size: 24px; font-weight: bold; text-align: center;">
-        0 / 0
+    <div id="sub-count-container">
+        <p class="label">Subs Until Next Spin</p>
+        <p id="sub-count-display" class="count">0 / 0</p>
     </div>
 
     <audio id="spin-sound" src="/custom_sounds/{{ selected_sound }}" preload="auto"></audio>

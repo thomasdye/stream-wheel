@@ -85,6 +85,7 @@ def reconnect_to_twitch_chat():
         try:
             print("Stopping previous Twitch reactor...")
             twitch_reactor._running = False
+            twitch_reactor.disconnect_all()  # Ensure all connections are disconnected
             twitch_reactor = None
         except Exception as e:
             print(f"Error stopping previous Twitch reactor: {e}")
@@ -93,7 +94,7 @@ def reconnect_to_twitch_chat():
     if twitch_connection:
         try:
             print("Disconnecting from Twitch chat...")
-            twitch_connection.disconnect()
+            twitch_connection.close()  # Close the connection explicitly
             twitch_connection = None
         except Exception as e:
             print(f"Error disconnecting from Twitch chat: {e}")
@@ -314,14 +315,18 @@ def settings():
             setting.sound = selected_sound
         else:
             setting = Settings(
-                value=value, 
-                green_screen_color=green_screen_color, 
-                sub_count=sub_count, 
+                value=value,
+                green_screen_color=green_screen_color,
+                sub_count=sub_count,
                 sound=selected_sound
             )
             db.session.add(setting)
 
         db.session.commit()
+
+        # Update the global Twitch username and reconnect
+        get_twitch_username()
+        reconnect_to_twitch_chat()
 
         # Emit a WebSocket event to notify clients of the update
         socketio.emit("settings_updated")
@@ -345,11 +350,11 @@ def settings():
             db.session.commit()
 
     return render_template(
-        'settings.html', 
-        current_value=current_value, 
-        green_screen_color=green_screen_color, 
-        sub_count=sub_count, 
-        sounds=sounds, 
+        'settings.html',
+        current_value=current_value,
+        green_screen_color=green_screen_color,
+        sub_count=sub_count,
+        sounds=sounds,
         selected_sound=selected_sound
     )
 
