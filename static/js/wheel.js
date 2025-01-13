@@ -1,6 +1,5 @@
 const canvas = document.getElementById('wheel');
         const ctx = canvas.getContext('2d');
-        const spinBtn = document.getElementById('spin-btn');
         const triggerSpinBtn = document.getElementById('trigger-spin-btn');
         const keyList = document.getElementById('key-list');
         const inactivityOverlay = document.getElementById('inactivity-overlay');
@@ -133,7 +132,6 @@ const canvas = document.getElementById('wheel');
         
                 // Show the "No Entries" modal
                 noEntriesModal.classList.remove('hidden');
-                spinBtn.disabled = true;
             } else {
                 drawWheel();
                 populateKey();
@@ -165,6 +163,7 @@ const canvas = document.getElementById('wheel');
         resetInactivityTimer();
 
         function triggerSpin() {
+            if (triggerSpinBtn) triggerSpinBtn.disabled = true;
             fetch('/trigger_spin', { method: 'POST' })
                 .then(response => {
                     if (!response.ok) {
@@ -239,7 +238,6 @@ const canvas = document.getElementById('wheel');
             spinning = true;
         
             // Disable both spin buttons
-            spinBtn.disabled = true;
             if (triggerSpinBtn) triggerSpinBtn.disabled = true;
         
             // Wait for 2 seconds before starting the spin
@@ -343,15 +341,51 @@ const canvas = document.getElementById('wheel');
                     timestamp: new Date().toISOString(),
                 });
         
-                // Re-enable the spin button
-                spinBtn.disabled = false;
-        
                 if (scriptName) {
                     fetch(`/execute_script/${scriptName}`, { method: "POST" })
                         .catch(error => console.error("Error executing script:", error));
                 }
             }, 10000);
-        }              
+        }
+        
+        document.addEventListener("DOMContentLoaded", () => {
+            const subCountDisplay = document.getElementById("sub-count-display");
+        
+            // Update subscription count
+            function updateSubCount(current, total) {
+                subCountDisplay.textContent = `${current} / ${total}`;
+            }
+        
+            // Fetch subscription count on page load
+            async function fetchSubCount() {
+                try {
+                    const response = await fetch('/sub_count');
+                    if (!response.ok) throw new Error("Failed to fetch sub count");
+                    const data = await response.json();
+                    updateSubCount(data.current_subs, data.total_subs);
+                } catch (error) {
+                    console.error("Error fetching sub count:", error);
+                }
+            }
+        
+            // WebSocket listener for sub count updates
+            socket.on("sub_count_updated", ({ current_subs, total_subs }) => {
+                updateSubCount(current_subs, total_subs);
+            });
+        
+            fetchSubCount(); // Initial fetch
+        });
+        
+        socket.on("spin_started", () => {
+            console.log("Spin started. Disabling the spin button.");
+            if (triggerSpinBtn) triggerSpinBtn.disabled = true;
+        });
+        
+        // Enable the spin button when a spin completes
+        socket.on("spin_completed", () => {
+            console.log("Spin completed. Enabling the spin button.");
+            if (triggerSpinBtn) triggerSpinBtn.disabled = false;
+        });
 
         function redirectToManage() {
             window.location.href = '/manage';

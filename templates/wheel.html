@@ -46,12 +46,15 @@
                 <div id="indicator"></div>
                 <canvas id="wheel" width="800" height="800"></canvas>
             </div>
-            <button id="spin-btn" onclick="triggerSpin()">Spin</button>
         </div>
         <div id="spin-history">
             <h2>Spin History</h2>
             <ul id="spin-history-list"></ul>
         </div>
+    </div>
+
+    <div id="sub-count-display" style="position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%); font-size: 24px; font-weight: bold; text-align: center;">
+        0 / 0
     </div>
 
     <div id="inactivity-overlay" data-color="{{ green_screen_color | default('#00FF00') }}"></div>

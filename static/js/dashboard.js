@@ -46,12 +46,25 @@ function updateSpinHistory() {
         });
 }
 
-// Listen for the spin_completed event
+// Listen for the spin completed event
 socket.on("spin_completed", (data) => {
-    console.log("Received spin_completed event:", data); // Log the event data
-    triggerSpinBtn.disabled = false; // Re-enable the button
-    console.log("Re-enabled the trigger-spin button.");
+    console.log("Spin completed with result:", data);
+    triggerSpinBtn.disabled = false;
     updateSpinHistory(); // Refresh the spin history
+
+    // Optionally display the result in the UI
+    const resultSection = document.querySelector("#result-section ul");
+    const newResult = document.createElement("li");
+    newResult.innerHTML = `
+        <span>${data.result}</span>
+        <span>${new Date(data.timestamp).toLocaleString()}</span>
+    `;
+    resultSection.prepend(newResult);
+});
+
+socket.on("trigger_spin", () => {
+    console.log("Spin triggered from the server (via sub count or manual).");
+    triggerSpinBtn.disabled = true; // Disable the button when the spin starts
 });
 
 // Attach the trigger spin function to the button

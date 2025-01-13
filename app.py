@@ -19,6 +19,8 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 socketio = SocketIO(app)
 
+sub_count = 0
+
 # Models
 class Entry(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -110,22 +112,27 @@ def on_connect(connection, event):
 
 def on_message(connection, event):
     global total_subs
-    user = event.source.split("!")[0]  # Extract the username
+    user = event.source.split("!")[0]
     message = event.arguments[0]
 
-    # Process only messages from 'streamlabs'
     if user.lower() == "streamlabs":
         if "just subscribed with" in message.lower():
             total_subs += 1
             print(f"New subscription detected! Total subs: {total_subs}")
+            with app.app_context():
+                sub_count = Settings.query.first().sub_count
             check_and_spin_wheel()
+            socketio.emit("sub_count_updated", {"current_subs": total_subs, "total_subs": sub_count})
 
         elif "just gifted" in message.lower() and "tier 1 subscriptions" in message.lower():
             try:
                 amount = int(message.split("just gifted")[1].split("Tier 1")[0].strip())
                 total_subs += amount
                 print(f"{amount} gifted subscriptions detected! Total subs: {total_subs}")
+                with app.app_context():
+                    sub_count = Settings.query.first().sub_count
                 check_and_spin_wheel()
+                socketio.emit("sub_count_updated", {"current_subs": total_subs, "total_subs": sub_count})
             except (ValueError, IndexError):
                 print("Error parsing gifted subscription message.")
 
@@ -138,53 +145,65 @@ def get_twitch_username():
 
 def check_and_spin_wheel():
     """Check if total subs is a multiple of the Sub Count value and trigger the spin."""
-    with app.app_context():  # Add application context
+    global total_subs  # Ensure we're modifying the global variable
+
+    with app.app_context():  # Ensure we're in the app context
         setting = Settings.query.first()
         sub_count = setting.sub_count if setting and setting.sub_count else 3
 
-    if total_subs % sub_count == 0:
-        print(f"Spinning the wheel! Sub Count Modulus: {sub_count}")
-        socketio.emit("trigger_spin")
+        if total_subs >= sub_count:
+            print(f"Spinning the wheel! Sub Count reached: {total_subs}/{sub_count}")
+
+            # Notify the frontend to trigger the spin
+            socketio.emit("trigger_spin")
+
+            # Reset total_subs after the spin
+            total_subs -= sub_count
+            print(f"Remaining subs after spin: {total_subs}")
 
 def spin_wheel():
     """Simulate spinning the wheel and notify the client."""
-    entries = Entry.query.all()
-    if not entries:
-        print("No entries on the wheel to spin.")
-        return
+    with app.app_context():  # Ensure we're in the app context
+        entries = Entry.query.all()
+        if not entries:
+            print("No entries on the wheel to spin.")
+            return
 
-    total_chance = sum(entry.weight for entry in entries)
-    random_pick = random.uniform(0, total_chance)
-    current = 0
-    selected_entry = None
+        total_chance = sum(entry.weight for entry in entries)
+        random_pick = random.uniform(0, total_chance)
+        current = 0
+        selected_entry = None
 
-    for entry in entries:
-        current += entry.weight
-        if random_pick <= current:
-            selected_entry = entry
-            break
+        for entry in entries:
+            current += entry.weight
+            if random_pick <= current:
+                selected_entry = entry
+                break
 
-    if selected_entry:
-        print(f"The wheel landed on: {selected_entry.name}")
-        if selected_entry.script_name:
-            execute_script(selected_entry.script_name)
+        if selected_entry:
+            print(f"The wheel landed on: {selected_entry.name}")
+            if selected_entry.script_name:
+                execute_script(selected_entry.script_name)
 
-        # Save the result to the spin_history database
-        try:
-            spin_history_entry = SpinHistory(
-                result=selected_entry.name,
-                timestamp=datetime.now()
-            )
-            db.session.add(spin_history_entry)
-            db.session.commit()
-            print(f"Spin history entry added: {spin_history_entry.result}")
-        except Exception as e:
-            print(f"Error saving spin history: {e}")
+            # Save the result to the spin_history database
+            try:
+                spin_history_entry = SpinHistory(
+                    result=selected_entry.name,
+                    timestamp=datetime.now()
+                )
+                db.session.add(spin_history_entry)
+                db.session.commit()
+                print(f"Spin history entry added: {spin_history_entry.result}")
+            except Exception as e:
+                print(f"Error saving spin history: {e}")
 
-        # Notify the client to spin the wheel
-        socketio.emit("spin_wheel", {"name": selected_entry.name})
-    else:
-        print("Something went wrong while spinning the wheel.")
+            # Notify all clients that the spin is completed
+            socketio.emit("spin_completed", {
+                "result": selected_entry.name,
+                "timestamp": datetime.now().isoformat(),
+            })
+        else:
+            print("Something went wrong while spinning the wheel.")
 
 @socketio.on('spin_completed')
 def handle_spin_completed(data):
@@ -300,7 +319,6 @@ def settings():
     green_screen_color = setting.green_screen_color if setting else "#00FF00"
     sub_count = setting.sub_count if setting else 3
     return render_template('settings.html', current_value=current_value, green_screen_color=green_screen_color, sub_count=sub_count)
-
 
 @app.route('/manage', methods=['GET', 'POST'])
 def manage():
@@ -436,6 +454,14 @@ def update_script(entry_id):
 
     return jsonify({"message": "Script updated successfully"}), 200
 
+@app.route('/sub_count', methods=['GET'])
+def sub_count():
+    """Return the current and total subscription count."""
+    global total_subs
+    setting = Settings.query.first()
+    sub_count = setting.sub_count if setting else 3
+    return jsonify({"current_subs": total_subs, "total_subs": sub_count})
+
 @app.route('/spin', methods=['GET'])
 def spin():
     entries = Entry.query.all()
@@ -511,6 +537,12 @@ def delete(id):
 with app.app_context():
     db.create_all()
     get_twitch_username()
+
+     # Initialize total_subs and emit to front end
+    total_subs = 0
+    setting = Settings.query.first()
+    sub_count = setting.sub_count if setting else 3
+    socketio.emit("sub_count_updated", {"current_subs": total_subs, "total_subs": sub_count})
 
 if __name__ == '__main__':
     threading.Thread(target=connect_to_twitch_chat, daemon=True).start()
