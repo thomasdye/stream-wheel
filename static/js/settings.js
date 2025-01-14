@@ -142,6 +142,7 @@ async function uploadScript(file) {
 
 function updateDropdown(sounds) {
     const dropdown = document.getElementById('sound');
+    const currentSelectedSound = dropdown.value; // Get the currently selected sound
     dropdown.innerHTML = `<option value="">None</option>`;
     sounds.forEach((sound) => {
         const option = document.createElement('option');
@@ -149,4 +150,9 @@ function updateDropdown(sounds) {
         option.textContent = sound;
         dropdown.appendChild(option);
     });
+
+    // Restore the current selection if it still exists
+    if (sounds.includes(currentSelectedSound)) {
+        dropdown.value = currentSelectedSound;
+    }
 }
