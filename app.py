@@ -12,9 +12,6 @@ import threading
 import random
 from eventlet import wsgi
 
-# Patch eventlet to work with subprocess
-
-
 app = Flask(__name__)
 app.secret_key = "thissecretkeyisonlyrequiredforflashingmessages"
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///wheel.db'
@@ -419,6 +416,27 @@ def set_username():
 
     # Return a success response
     return jsonify({"message": "Username set successfully"})
+
+@app.route('/upload_sound', methods=['POST'])
+def upload_sound():
+    file = request.files.get('file')
+    if not file:
+        return jsonify({"message": "No file provided", "sounds": []}), 400
+    
+    if not file.filename.endswith(('.mp3', '.wav')):
+        return jsonify({"message": "Invalid file type", "sounds": []}), 400
+
+    sound_dir = os.path.join(os.getcwd(), "custom_sounds")
+    if not os.path.exists(sound_dir):
+        os.makedirs(sound_dir)
+
+    file.save(os.path.join(sound_dir, file.filename))
+    flash("File uploaded successfully!", "success")
+
+    # Return the flash message and updated sounds
+    sounds = get_sounds()  # Fetch updated list of sounds
+    return jsonify({"message": "File uploaded successfully!", "sounds": sounds}), 200
+
 
 @app.route('/update_weight/<int:id>', methods=['POST'])
 def update_weight(id):

@@ -36,7 +36,7 @@
                 min="1"
                 required
             >
-            <label for="sound">Sound</label>
+            <label for="sound">Wheel Spin Sound</label>
             <select id="sound" name="sound" class="styled-input">
                 <option value="" {% if not selected_sound %}selected{% endif %}>None</option>
                 {% for sound in sounds %}
@@ -45,18 +45,17 @@
                     </option>
                 {% endfor %}
             </select>
+            <div id="upload-container">
+                <label for="file-input">Upload Custom Sound</label>
+                <div id="drop-zone" class="drop-zone">
+                    <p>Drag & drop .mp3 or .wav <span id="file-select">click to browse</span></p>
+                    <input type="file" id="file-input" accept=".mp3, .wav" hidden>
+                </div>
+            </div>
             <button type="submit">Save Settings</button>
         </form>
-        {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            <div class="toast">
-                {% for category, message in messages %}
-                    <p>{{ message }}</p>
-                {% endfor %}
-            </div>
-        {% endif %}
-        {% endwith %}
         <a href="/">Back to Dashboard</a>
     </div>
+    <script src="static/js/settings.js" defer></script>
 </body>
 </html>
