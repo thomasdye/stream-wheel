@@ -433,10 +433,27 @@ def upload_sound():
     file.save(os.path.join(sound_dir, file.filename))
     flash("File uploaded successfully!", "success")
 
-    # Return the flash message and updated sounds
-    sounds = get_sounds()  # Fetch updated list of sounds
+    sounds = get_sounds()
     return jsonify({"message": "File uploaded successfully!", "sounds": sounds}), 200
 
+@app.route('/upload_script', methods=['POST'])
+def upload_script():
+    file = request.files.get('file')
+    if not file:
+        return jsonify({"message": "No file provided", "scripts": []}), 400
+    
+    if not file.filename.endswith('.py'):
+        return jsonify({"message": "Only .py files are allowed", "scripts": []}), 400
+
+    script_dir = os.path.join(os.getcwd(), "custom_scripts")
+    if not os.path.exists(script_dir):
+        os.makedirs(script_dir)
+
+    file.save(os.path.join(script_dir, file.filename))
+    flash("Script uploaded successfully!", "success")
+
+    scripts = get_scripts()
+    return jsonify({"message": "Script uploaded successfully!", "scripts": scripts}), 200
 
 @app.route('/update_weight/<int:id>', methods=['POST'])
 def update_weight(id):

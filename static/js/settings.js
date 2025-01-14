@@ -1,37 +1,70 @@
-const dropZone = document.getElementById('drop-zone');
-const fileInput = document.getElementById('file-input');
+// Variables for custom sound upload
+const soundDropZone = document.getElementById('drop-zone');
+const soundInput = document.getElementById('file-input');
 
-// Highlight drop zone when dragging files
-dropZone.addEventListener('dragover', (e) => {
+// Variables for custom Python script upload
+const scriptDropZone = document.getElementById('script-drop-zone');
+const scriptInput = document.getElementById('script-input');
+
+// Highlight sound drop zone
+soundDropZone.addEventListener('dragover', (e) => {
     e.preventDefault();
-    dropZone.classList.add('dragover');
+    soundDropZone.classList.add('dragover');
 });
 
-dropZone.addEventListener('dragleave', () => {
-    dropZone.classList.remove('dragover');
+soundDropZone.addEventListener('dragleave', () => {
+    soundDropZone.classList.remove('dragover');
 });
 
-// Handle file drop
-dropZone.addEventListener('drop', async (e) => {
+// Handle sound file drop
+soundDropZone.addEventListener('drop', async (e) => {
     e.preventDefault();
-    dropZone.classList.remove('dragover');
+    soundDropZone.classList.remove('dragover');
     const file = e.dataTransfer.files[0];
     if (file) {
-        await uploadFile(file);
+        await uploadSound(file);
     }
 });
 
-// Handle file selection
-dropZone.addEventListener('click', () => fileInput.click());
-fileInput.addEventListener('change', async () => {
-    const file = fileInput.files[0];
+// Handle sound file selection
+soundDropZone.addEventListener('click', () => soundInput.click());
+soundInput.addEventListener('change', async () => {
+    const file = soundInput.files[0];
     if (file) {
-        await uploadFile(file);
+        await uploadSound(file);
+    }
+});
+
+// Highlight script drop zone
+scriptDropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    scriptDropZone.classList.add('dragover');
+});
+
+scriptDropZone.addEventListener('dragleave', () => {
+    scriptDropZone.classList.remove('dragover');
+});
+
+// Handle Python script file drop
+scriptDropZone.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    scriptDropZone.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file) {
+        await uploadScript(file);
+    }
+});
+
+// Handle Python script file selection
+scriptDropZone.addEventListener('click', () => scriptInput.click());
+scriptInput.addEventListener('change', async () => {
+    const file = scriptInput.files[0];
+    if (file) {
+        await uploadScript(file);
     }
 });
 
 function showToast(message, category) {
-    // Create the toast container if it doesn't exist
     let toastContainer = document.getElementById('server-toast-container');
     if (!toastContainer) {
         toastContainer = document.createElement('div');
@@ -39,40 +72,19 @@ function showToast(message, category) {
         document.body.appendChild(toastContainer);
     }
 
-    // Create a toast element
     const toast = document.createElement('div');
     toast.className = `toast ${category}`;
     toast.textContent = message;
 
-    // Append toast to the container
     toastContainer.appendChild(toast);
 
-    // Remove toast after 3 seconds
     setTimeout(() => {
         toast.remove();
     }, 3000);
 }
 
-// Display server flash messages (if any) when the page loads
-if (serverMessages && Array.isArray(serverMessages)) {
-    serverMessages.forEach(([category, message]) => {
-        showToast(message, category);
-    });
-}
-
-function updateDropdown(sounds) {
-    const dropdown = document.getElementById('sound');
-    dropdown.innerHTML = `<option value="">None</option>`;
-    sounds.forEach((sound) => {
-        const option = document.createElement('option');
-        option.value = sound;
-        option.textContent = sound;
-        dropdown.appendChild(option);
-    });
-}
-
-// Upload file to server
-async function uploadFile(file) {
+// Function to upload sound file
+async function uploadSound(file) {
     if (!['audio/mpeg', 'audio/wav'].includes(file.type)) {
         showToast('Only .mp3 and .wav files are allowed.', 'error');
         return;
@@ -96,6 +108,45 @@ async function uploadFile(file) {
             showToast(error, 'error');
         }
     } catch (error) {
-        showToast('An error occurred while uploading the file.', 'error');
+        showToast('An error occurred while uploading the sound file.', 'error');
     }
+}
+
+// Function to upload Python script
+async function uploadScript(file) {
+    if (!file.name.endsWith('.py')) {
+        showToast('Only .py files are allowed.', 'error');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const response = await fetch('/upload_script', {
+            method: 'POST',
+            body: formData,
+        });
+
+        if (response.ok) {
+            const { message, scripts } = await response.json();
+            showToast(message, 'success');
+        } else {
+            const error = await response.text();
+            showToast(error, 'error');
+        }
+    } catch (error) {
+        showToast('An error occurred while uploading the script file.', 'error');
+    }
+}
+
+function updateDropdown(sounds) {
+    const dropdown = document.getElementById('sound');
+    dropdown.innerHTML = `<option value="">None</option>`;
+    sounds.forEach((sound) => {
+        const option = document.createElement('option');
+        option.value = sound;
+        option.textContent = sound;
+        dropdown.appendChild(option);
+    });
 }
