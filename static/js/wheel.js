@@ -66,7 +66,6 @@ const canvas = document.getElementById('wheel');
             const usernameForm = document.getElementById("username-form");
             const usernameInput = document.getElementById("username-input");
             const errorMessage = document.getElementById("error-message");
-            const usernameModal = document.getElementById("username-modal");
         
             usernameForm.addEventListener("submit", (event) => {
                 event.preventDefault();
@@ -139,18 +138,8 @@ const canvas = document.getElementById('wheel');
             const data = await response.json();
             segments = data.entries || [];
         
-            // Check if the Twitch username modal is already visible
-            const usernameModal = document.getElementById('username-modal');
-            const noEntriesModal = document.getElementById('no-entries-modal');
-        
             if (segments.length === 0) {
-                // If the Twitch username modal is visible, do not show the "No Entries" modal
-                if (usernameModal && !usernameModal.classList.contains('hidden')) {
-                    return;
-                }
-        
-                // Show the "No Entries" modal
-                noEntriesModal.classList.remove('hidden');
+                return;
             } else {
                 drawWheel();
                 populateKey();

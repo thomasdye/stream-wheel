@@ -81,11 +81,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function updateObsParamVisibility(action) {
         if (["ShowSource", "HideSource"].includes(action)) {
-            obsParamLabel.textContent = "OBS Source:";
+            obsParamLabel.textContent = "OBS Source";
             obsParamContainer.classList.remove("hidden");
             obsParamInput.placeholder = "Enter source name";
         } else if (["SwitchScene"].includes(action)) {
-            obsParamLabel.textContent = "OBS Scene:";
+            obsParamLabel.textContent = "OBS Scene";
             obsParamContainer.classList.remove("hidden");
             obsParamInput.placeholder = "Enter scene name";
         } else {
@@ -272,8 +272,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
     
         weightInputs.forEach((input, index) => {
-            const percentage = totalWeight > 0 ? ((weights[index] / totalWeight) * 100).toFixed(2) : 0;
-            percentageDisplays[index].textContent = totalWeight > 0 ? percentage : "--";
+            const percentage = totalWeight > 0 ? ((weights[index] / totalWeight) * 100).toFixed(2) : "--";
+            percentageDisplays[index].textContent = percentage !== "--" ? percentage : "--";
         });
     }
 
@@ -382,6 +382,8 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
-    updateObsParamDisplay(dropdown);
+    obsDropdowns.forEach((dropdown) => {
+        updateObsParamDisplay(dropdown);
+    });
     updatePercentages();
 });

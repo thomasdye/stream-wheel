@@ -275,6 +275,12 @@ a:hover {
     color: #0056b3;
 }
 
+.current-obs-action {
+    text-align: center;
+    display: block;
+    margin-top: 5px;
+}
+
 .script-info {
     display: flex;
     align-items: center;
@@ -287,7 +293,15 @@ a:hover {
 .script-label,
 .obs-label {
     color: #ffffff;
-    margin-right: 5px;
+    text-align: center;
+}
+
+.dynamic-label {
+    text-align: center;
+    display: block;
+    font-size: 16px;
+    margin-bottom: 5px;
+    color: #ffffff;
 }
 
 .script-dropdown,

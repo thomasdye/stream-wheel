@@ -22,7 +22,7 @@
             <option value="SwitchScene">Switch Scene</option>
         </select>
         <div id="obs-param-container" class="hidden">
-            <label id="obs-param-label" for="obs-action-param">OBS Parameter:</label>
+            <label id="obs-param-label" for="obs-action-param" class="dynamic-label">OBS Parameter</label>
             <input type="text" name="obs_action_param" id="obs-action-param" class="obs-param-input" placeholder="Enter scene/source name">
         </div>
 
@@ -105,8 +105,7 @@
                         class="weight-input" 
                         value="{{ entry.weight }}" 
                         data-id="{{ entry.id }}" 
-                        min="1"
-                        >
+                        min="1">
                 </div>
                 <span class="percentage">(<span class="calculated-percentage">--</span>%)</span>
             </div>
