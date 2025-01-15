@@ -307,7 +307,40 @@ a:hover {
     display: none;
 }
 
+.hidden {
+    display: none;
+}
+
 .script-dropdown:focus,
 .obs-action-dropdown:focus {
     border: 1px solid #ffffff;
+}
+
+.obs-param-label {
+    color: #ffffff;
+    margin-right: 5px;
+    font-size: 14px;
+}
+
+.obs-param-input {
+    font-size: 14px;
+    padding: 8px;
+    background-color: #1e1e1e;
+    color: #ffffff;
+    border: none;
+    border-radius: 5px;
+    transition: border 0.2s ease;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+}
+
+.obs-param-input:focus {
+    border: 1px solid #ffffff;
+    outline: none;
+}
+
+.obs-param-input:not(:focus) {
+    border: none;
 }

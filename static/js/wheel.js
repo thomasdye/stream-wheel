@@ -303,7 +303,8 @@ const canvas = document.getElementById('wheel');
                                 segmentColor,
                                 chancePercentage,
                                 selectedSegment.description || "No description provided",
-                                selectedSegment.obsAction
+                                selectedSegment.obsAction,
+                                selectedSegment.obsActionParam
                             );
                         } else {
                             console.error('Error determining the selected segment');
@@ -313,7 +314,7 @@ const canvas = document.getElementById('wheel');
             }, 2000); // 2-second delay before starting the spin
         }
     
-        function showModal(entryName, scriptName, color, chance, description, obsAction) {
+        function showModal(entryName, scriptName, color, chance, description, obsAction, obsActionParam) {
             const modal = document.getElementById("result-modal");
             const modalContent = document.getElementById("result-content");
             const modalTitle = document.getElementById("modal-title");
@@ -351,7 +352,7 @@ const canvas = document.getElementById('wheel');
                     console.error("Error saving spin result:", error);
                 });
         
-            // Hide modal after 10 seconds and execute Custom Sript / OBS action
+            // Hide modal after 10 seconds and execute custom script / OBS action
             setTimeout(() => {
                 modal.classList.remove("show");
         
@@ -375,15 +376,74 @@ const canvas = document.getElementById('wheel');
         
                 // Execute OBS action if present
                 if (obsAction) {
-                    fetch(`/execute_obs_action`, {
-                        method: "POST",
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ action: obsAction })
-                    })
-                        .catch(error => console.error("Error executing OBS action:", error));
-                }
+                    let bodyData = { action: obsAction };
+
+                    // Add obs_action_param and scene_name only when necessary
+                    if (["ShowSource", "HideSource"].includes(obsAction)) {
+                        fetch('/get_current_scene')
+                            .then((response) => response.json())
+                            .then((data) => {
+                                if (data.current_scene) {
+                                    bodyData.scene_name = data.current_scene;
+                                    bodyData.obs_action_param = obsActionParam;
+                                } else {
+                                    console.error("Error: Current scene is required but not available.");
+                                    return;
+                                }
+
+                                // Send the request
+                                fetch(`/execute_obs_action`, {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify(bodyData),
+                                })
+                                    .then((response) => {
+                                        if (!response.ok) {
+                                            return response.text().then((errorText) => {
+                                                throw new Error(`Server error: ${errorText}`);
+                                            });
+                                        }
+                                        console.log("OBS action executed successfully!");
+                                    })
+                                    .catch((error) => console.error("Error executing OBS action:", error));
+                            })
+                            .catch((error) => console.error("Error fetching current scene:", error));
+                    } else if (["SwitchScene", "ShowScene"].includes(obsAction)) {
+                        bodyData.scene_name = obsActionParam; // Use obsActionParam as the scene name
+                        fetch(`/execute_obs_action`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(bodyData),
+                        })
+                            .then((response) => {
+                                if (!response.ok) {
+                                    return response.text().then((errorText) => {
+                                        throw new Error(`Server error: ${errorText}`);
+                                    });
+                                }
+                                console.log("OBS action executed successfully!");
+                            })
+                            .catch((error) => console.error("Error executing OBS action:", error));
+                    } else {
+                        // For StartStream and StopStream
+                        fetch(`/execute_obs_action`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(bodyData),
+                        })
+                            .then((response) => {
+                                if (!response.ok) {
+                                    return response.text().then((errorText) => {
+                                        throw new Error(`Server error: ${errorText}`);
+                                    });
+                                }
+                                console.log("OBS action executed successfully!");
+                            })
+                            .catch((error) => console.error("Error executing OBS action:", error));
+                    }
+                }         
             }, 10000);
-        }        
+        }              
         
         document.addEventListener("DOMContentLoaded", () => {
             const subCountDisplay = document.getElementById("sub-count-display");

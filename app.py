@@ -42,6 +42,7 @@ class Entry(db.Model):
     weight = db.Column(db.Float, nullable=False, default=1)
     script_name = db.Column(db.String(100), nullable=True)
     obs_action = db.Column(db.String(100), nullable=True)
+    obs_action_param = db.Column(db.String(100), nullable=True)
     description = db.Column(db.String(100), nullable=True)
 
 class Settings(db.Model):
@@ -154,24 +155,51 @@ def on_message(connection, event):
                 print("Error parsing gifted subscription message.")
 
 def perform_obs_action(action, params=None):
-    """
-    Perform the specified OBS action using the WebSocket API.
-    """
     if params is None:
         params = {}
 
     try:
-        # Connect to OBS WebSocket
         ws = obsws(OBS_HOST, OBS_PORT, OBS_PASSWORD)
         ws.connect()
 
         if action == "StartStream":
             ws.call(requests.StartStream())
-            print(f"Successfully started the stream with scene")
+            print("Successfully started the stream")
 
         elif action == "StopStream":
             ws.call(requests.StopStream())
-            print(f"Successfully stopped the stream")
+            print("Successfully stopped the stream")
+
+        elif action in ["ShowSource", "HideSource"]:
+            scene_name = params.get("scene_name")
+            source_name = params.get("obs_action_param")
+
+            if not scene_name or not source_name:
+                print("Scene name or source name is missing.")
+                ws.disconnect()
+                return
+
+            response = ws.call(requests.GetSceneItemList(sceneName=scene_name))
+            scene_items = response.getSceneItems()
+
+            scene_item = next((item for item in scene_items if item["sourceName"] == source_name), None)
+
+            if scene_item:
+                ws.call(
+                    requests.SetSceneItemEnabled(
+                        sceneName=scene_name,
+                        sceneItemId=scene_item["sceneItemId"],
+                        sceneItemEnabled=(action == "ShowSource")
+                    )
+                )
+                print(f"{'Enabled' if action == 'ShowSource' else 'Disabled'} source: {source_name}")
+            else:
+                print(f"Source '{source_name}' not found in scene '{scene_name}'")
+
+        elif action == "SwitchScene":
+            scene_name = params.get("scene_name")
+            ws.call(requests.SetCurrentProgramScene(sceneName=scene_name))
+            print(f"Successfully switched to scene: {scene_name}")
 
         else:
             print(f"Unknown OBS action: {action}")
@@ -187,16 +215,47 @@ def perform_obs_action(action, params=None):
 def execute_obs_action():
     data = request.json
     action = data.get("action", "").strip()
+    scene_name = data.get("scene_name", "").strip()
+    obs_action_param = data.get("obs_action_param", "").strip()
 
+    # Validate action
     if not action:
-        return jsonify({"error": "OBS action is required"}), 400
+        return jsonify({"error": "Action is required"}), 400
+
+    # Validate based on action type
+    if action in ["ShowSource", "HideSource"] and (not scene_name or not obs_action_param):
+        return jsonify({"error": "Scene name and source name are required for this action"}), 400
+    elif action in ["SwitchScene", "ShowScene"] and not scene_name:
+        return jsonify({"error": "Scene name is required for this action"}), 400
 
     try:
-        # Perform the OBS action
-        perform_obs_action(action)
+        # Perform the OBS action with the parameters
+        perform_obs_action(action, {"scene_name": scene_name, "obs_action_param": obs_action_param})
         return jsonify({"message": "OBS action executed successfully"}), 200
     except Exception as e:
         print(f"Error executing OBS action: {e}")
+        return jsonify({"error": str(e)}), 500
+    
+@app.route('/get_current_scene', methods=['GET'])
+def get_current_scene():
+    try:
+        # Connect to OBS WebSocket
+        ws = obsws(OBS_HOST, OBS_PORT, OBS_PASSWORD)
+        ws.connect()
+
+        # Call the API to get the current program scene
+        current_scene_response = ws.call(requests.GetCurrentProgramScene())
+
+        # Use the correct method to retrieve the current scene name
+        current_scene_name = current_scene_response.getSceneName()
+        ws.disconnect()
+
+        return jsonify({"current_scene": current_scene_name}), 200
+    except obswebsocket.exceptions.ConnectionFailure as e:
+        print(f"Failed to connect to OBS WebSocket: {e}")
+        return jsonify({"error": "Failed to connect to OBS WebSocket"}), 500
+    except Exception as e:
+        print(f"Error retrieving current scene: {e}")
         return jsonify({"error": str(e)}), 500
     
 def get_twitch_username():
@@ -421,6 +480,7 @@ def manage():
         weight = request.form.get('weight', type=float)
         selected_script = request.form.get('script')
         selected_obs_action = request.form.get('obs_action')
+        obs_action_param = request.form.get('obs_action_param')
         description = request.form.get('description', '').strip()
 
         if not new_entry.strip():
@@ -436,6 +496,7 @@ def manage():
                 weight=weight,
                 script_name=selected_script,
                 obs_action=selected_obs_action,
+                obs_action_param=obs_action_param,
                 description=description,
             )
         )
@@ -540,7 +601,7 @@ def update_title(id):
     if not new_name:
         return jsonify({"error": "Title cannot be empty"}), 400
 
-    entry = Entry.query.get(id)
+    entry = db.session.get(Entry, id)
     if entry:
         entry.name = new_name
         db.session.commit()
@@ -600,12 +661,18 @@ def update_obs_action(entry_id):
     data = request.json
     obs_action = data.get("obs_action", "").strip()
 
-    # Restrict allowed actions to "StartStream" and "StopStream"
-    allowed_actions = ["StartStream", "StopStream"]
+    # Restrict allowed actions
+    allowed_actions = [
+        "StartStream",
+        "StopStream",
+        "HideSource",
+        "ShowSource",
+        "SwitchScene",
+    ]
     if obs_action and obs_action not in allowed_actions:
         return jsonify({"error": "Invalid OBS action"}), 400
 
-    entry = Entry.query.get(entry_id)
+    entry = db.session.get(Entry, entry_id)
     if not entry:
         return jsonify({"error": "Entry not found"}), 404
 
@@ -614,6 +681,21 @@ def update_obs_action(entry_id):
     db.session.commit()
 
     return jsonify({"message": "OBS action updated successfully"}), 200
+
+@app.route('/update_obs_action_param/<int:entry_id>', methods=['POST'])
+def update_obs_action_param(entry_id):
+    data = request.json
+    obs_action_param = data.get("obs_action_param", "").strip()
+
+    entry = db.session.get(Entry, entry_id)
+    if not entry:
+        return jsonify({"error": "Entry not found"}), 404
+
+    # Update the OBS action parameter for the entry
+    entry.obs_action_param = obs_action_param if obs_action_param else None
+    db.session.commit()
+
+    return jsonify({"message": "OBS action parameter updated successfully"}), 200
 
 @app.route('/custom_sounds/<path:filename>')
 def custom_sounds(filename):
@@ -638,7 +720,8 @@ def spin():
             'chance': (entry.weight / total_weight) * 100,
             'script': entry.script_name,
             'description': entry.description,
-            'obsAction': entry.obs_action
+            'obsAction': entry.obs_action,
+            'obsActionParam': entry.obs_action_param
         }
         for entry in entries
     ]

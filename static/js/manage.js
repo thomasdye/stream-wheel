@@ -8,6 +8,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const obsLabels = document.querySelectorAll(".current-obs-action");
     const obsDropdowns = document.querySelectorAll(".obs-action-dropdown");
     const toast = document.getElementById("toast");
+    const obsActionSelect = document.getElementById("obs-action-select");
+    const obsParamContainer = document.getElementById("obs-param-container");
+    const obsParamLabel = document.getElementById("obs-param-label");
+    const obsParamInput = document.getElementById("obs-action-param");
+    const obsParamInputs = document.querySelectorAll(".obs-param-input");
 
     function showToast(message) {
         toast.textContent = message;
@@ -34,6 +39,8 @@ document.addEventListener("DOMContentLoaded", () => {
         dropdown.addEventListener("change", () => {
             const entryId = dropdown.dataset.id;
             const selectedScript = dropdown.value;
+
+            updateObsParamDisplay(dropdown);
 
             // Send updated script to the backend
             fetch(`/update_script/${entryId}`, {
@@ -72,6 +79,25 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
+    function updateObsParamVisibility(action) {
+        if (["ShowSource", "HideSource"].includes(action)) {
+            obsParamLabel.textContent = "OBS Source:";
+            obsParamContainer.classList.remove("hidden");
+            obsParamInput.placeholder = "Enter source name";
+        } else if (["SwitchScene"].includes(action)) {
+            obsParamLabel.textContent = "OBS Scene:";
+            obsParamContainer.classList.remove("hidden");
+            obsParamInput.placeholder = "Enter scene name";
+        } else {
+            obsParamContainer.classList.add("hidden");
+            obsParamInput.value = ""; // Clear the input value
+        }
+    }
+
+    obsActionSelect.addEventListener("change", (event) => {
+        updateObsParamVisibility(event.target.value);
+    });
+
     // Handle OBS Action dropdown functionality
     obsLabels.forEach((label) => {
         label.addEventListener("click", () => {
@@ -88,10 +114,55 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     obsDropdowns.forEach((dropdown) => {
+        const entryId = dropdown.dataset.id;
+        const selectedAction = dropdown.value;
+    
+        const obsParamLabel = document.querySelector(`.obs-param-label[data-id="${entryId}"]`);
+        const obsParamInput = document.querySelector(`.obs-param-input[data-id="${entryId}"]`);
+    
+        if (["ShowSource", "HideSource"].includes(selectedAction)) {
+            obsParamLabel.textContent = "OBS Source:";
+            obsParamInput.placeholder = "Enter source name";
+            obsParamLabel.style.display = "inline";
+            obsParamInput.style.display = "inline";
+        } else if (["SwitchScene"].includes(selectedAction)) {
+            obsParamLabel.textContent = "OBS Scene:";
+            obsParamInput.placeholder = "Enter scene name";
+            obsParamLabel.style.display = "inline";
+            obsParamInput.style.display = "inline";
+        } else {
+            obsParamLabel.style.display = "none";
+            obsParamInput.style.display = "none";
+        }
+    });
+
+    obsDropdowns.forEach((dropdown) => {
         dropdown.addEventListener("change", () => {
             const entryId = dropdown.dataset.id;
             const selectedAction = dropdown.value;
-
+    
+            // Dynamically update the OBS parameter label and input visibility
+            const obsParamLabel = document.querySelector(`.obs-param-label[data-id="${entryId}"]`);
+            const obsParamInput = document.querySelector(`.obs-param-input[data-id="${entryId}"]`);
+    
+            // Actions that require parameter input
+            if (["ShowSource", "HideSource"].includes(selectedAction)) {
+                obsParamLabel.textContent = "OBS Source:";
+                obsParamInput.placeholder = "Enter source name";
+                obsParamLabel.style.display = "inline";
+                obsParamInput.style.display = "inline";
+            } else if (["SwitchScene"].includes(selectedAction)) {
+                obsParamLabel.textContent = "OBS Scene:";
+                obsParamInput.placeholder = "Enter scene name";
+                obsParamLabel.style.display = "inline";
+                obsParamInput.style.display = "inline";
+            } else {
+                // Hide the label and input for actions that don't need parameters
+                obsParamLabel.style.display = "none";
+                obsParamInput.style.display = "none";
+                obsParamInput.value = ""; // Clear the input value
+            }
+    
             // Send updated OBS action to the backend
             fetch(`/update_obs_action/${entryId}`, {
                 method: "POST",
@@ -100,42 +171,109 @@ document.addEventListener("DOMContentLoaded", () => {
                 },
                 body: JSON.stringify({ obs_action: selectedAction }),
             })
-                .then((response) => {
-                    if (!response.ok) {
-                        throw new Error("Failed to update OBS action.");
-                    }
-                    return response.json();
-                })
-                .then(() => {
-                    showToast("Successfully updated OBS action");
-
-                    // Update the label text and toggle visibility
-                    const label = document.querySelector(`.current-obs-action[data-id="${entryId}"]`);
-                    label.textContent = selectedAction || "None";
-                    label.style.display = "inline";
-                    dropdown.classList.add("hidden");
-                })
-                .catch((error) => {
-                    console.error("Error updating OBS action:", error);
-                    showToast("Error updating OBS action");
-                });
+                .then((response) => response.json())
+                .then(() => showToast("Successfully updated OBS action"))
+                .catch((error) => console.error("Error updating OBS action:", error));
         });
-
-        dropdown.addEventListener("blur", () => {
-            // Hide the dropdown and show the label when it loses focus
-            dropdown.classList.add("hidden");
-            const label = document.querySelector(`.current-obs-action[data-id="${dropdown.dataset.id}"]`);
-            label.style.display = "inline";
+    });    
+    
+    obsParamInputs.forEach((input) => {
+        input.addEventListener("keydown", (event) => {
+            if (event.key === "Enter") {
+                event.preventDefault(); // Prevent form submission or newline
+    
+                const entryId = input.dataset.id;
+                const newParam = input.value.trim();
+    
+                if (newParam.length === 0) {
+                    showToast("OBS parameter cannot be empty");
+                    input.value = input.defaultValue; // Revert to previous value
+                    return;
+                }
+    
+                // Send updated OBS parameter to the backend
+                fetch(`/update_obs_action_param/${entryId}`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ obs_action_param: newParam }),
+                })
+                    .then((response) => {
+                        if (!response.ok) {
+                            console.error("Failed to update OBS parameter.");
+                            showToast("Error updating OBS parameter");
+                            input.value = input.defaultValue;
+                        } else {
+                            input.defaultValue = newParam; // Update default value
+                            showToast("Successfully updated OBS parameter");
+                        }
+                    })
+                    .catch((error) => {
+                        console.error("Error updating OBS parameter:", error);
+                        showToast("Error updating OBS parameter");
+                        input.value = input.defaultValue; // Revert to previous value
+                    });
+            }
         });
     });
 
-    function updatePercentages() {
-        const weights = Array.from(weightInputs).map((input) => parseFloat(input.value));
-        const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+    // Function to handle dynamic updates for OBS Parameter
+    function updateObsParamDisplay(dropdown) {
+        const entryId = dropdown.dataset.id;
+        const selectedAction = dropdown.value;
+        const obsParamLabel = document.querySelector(`.obs-param-label[data-id="${entryId}"]`);
+        const obsParamInput = document.querySelector(`.obs-param-input[data-id="${entryId}"]`);
 
+        if (["ShowSource", "HideSource"].includes(selectedAction)) {
+            obsParamLabel.textContent = "OBS Source:";
+            obsParamLabel.style.display = "inline";
+            obsParamInput.style.display = "inline";
+            obsParamInput.placeholder = "Enter source name";
+        } else if (["SwitchScene"].includes(selectedAction)) {
+            obsParamLabel.textContent = "OBS Scene:";
+            obsParamLabel.style.display = "inline";
+            obsParamInput.style.display = "inline";
+            obsParamInput.placeholder = "Enter scene name";
+        } else if (["StartStream", "StopStream"].includes(selectedAction)) {
+            obsParamLabel.style.display = "none";
+            obsParamInput.style.display = "none";
+            obsParamInput.value = ""; // Clear the input value
+        } else {
+            obsParamLabel.textContent = "OBS Parameter:";
+            obsParamLabel.style.display = "inline";
+            obsParamInput.style.display = "inline";
+        }
+    }
+
+    function toggleObsParamInput(action) {
+        const actionsRequiringParams = ["HideSource", "ShowSource", "SwitchScene"];
+    
+        if (actionsRequiringParams.includes(action)) {
+            obsParamContainer.classList.remove("hidden");
+        } else {
+            obsParamContainer.classList.add("hidden");
+            obsParamInput.value = ""; // Clear parameter input when hidden
+        }
+    }
+
+    // Listen for changes on the OBS action dropdown
+    obsActionSelect.addEventListener("change", (event) => {
+        toggleObsParamInput(event.target.value);
+        updateObsParamVisibility(event.target.value);
+    });
+
+    // Initialize the parameter input visibility
+    toggleObsParamInput(obsActionSelect.value);
+    updateObsParamVisibility(obsActionSelect.value);
+
+    function updatePercentages() {
+        const weights = Array.from(weightInputs).map((input) => parseFloat(input.value) || 0);
+        const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+    
         weightInputs.forEach((input, index) => {
             const percentage = totalWeight > 0 ? ((weights[index] / totalWeight) * 100).toFixed(2) : 0;
-            percentageDisplays[index].textContent = percentage;
+            percentageDisplays[index].textContent = totalWeight > 0 ? percentage : "--";
         });
     }
 
@@ -244,5 +382,6 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
+    updateObsParamDisplay(dropdown);
     updatePercentages();
 });
