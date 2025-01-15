@@ -296,13 +296,14 @@ const canvas = document.getElementById('wheel');
                         if (selectedSegment) {
                             const segmentColor = colors[segments.indexOf(selectedSegment) % colors.length];
                             const chancePercentage = (selectedSegment.chance / totalChance) * 100;
-        
+                        
                             showModal(
                                 selectedSegment.name,
                                 selectedSegment.script,
                                 segmentColor,
                                 chancePercentage,
-                                selectedSegment.description || "No description provided"
+                                selectedSegment.description || "No description provided",
+                                selectedSegment.obsAction
                             );
                         } else {
                             console.error('Error determining the selected segment');
@@ -312,7 +313,7 @@ const canvas = document.getElementById('wheel');
             }, 2000); // 2-second delay before starting the spin
         }
     
-        function showModal(entryName, scriptName, color, chance, description) {
+        function showModal(entryName, scriptName, color, chance, description, obsAction) {
             const modal = document.getElementById("result-modal");
             const modalContent = document.getElementById("result-content");
             const modalTitle = document.getElementById("modal-title");
@@ -350,14 +351,14 @@ const canvas = document.getElementById('wheel');
                     console.error("Error saving spin result:", error);
                 });
         
-            // Hide modal after 10 seconds and notify all clients
+            // Hide modal after 10 seconds and execute Custom Sript / OBS action
             setTimeout(() => {
                 modal.classList.remove("show");
         
                 // Stop the spin sound when the modal closes
                 if (spinSound) {
                     spinSound.pause();
-                    spinSound.currentTime = 0; // Reset to the beginning
+                    spinSound.currentTime = 0;
                 }
         
                 // Emit spin completed event
@@ -366,12 +367,23 @@ const canvas = document.getElementById('wheel');
                     timestamp: new Date().toISOString(),
                 });
         
+                // Execute custom script if present
                 if (scriptName) {
                     fetch(`/execute_script/${scriptName}`, { method: "POST" })
                         .catch(error => console.error("Error executing script:", error));
                 }
+        
+                // Execute OBS action if present
+                if (obsAction) {
+                    fetch(`/execute_obs_action`, {
+                        method: "POST",
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: obsAction })
+                    })
+                        .catch(error => console.error("Error executing OBS action:", error));
+                }
             }, 10000);
-        }
+        }        
         
         document.addEventListener("DOMContentLoaded", () => {
             const subCountDisplay = document.getElementById("sub-count-display");

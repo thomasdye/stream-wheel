@@ -11,6 +11,12 @@ import irc.client
 import threading
 import random
 from eventlet import wsgi
+from obswebsocket import obsws, requests
+import obswebsocket
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = "thissecretkeyisonlyrequiredforflashingmessages"
@@ -25,12 +31,17 @@ socketio = SocketIO(app)
 
 sub_count = 0
 
+OBS_HOST = os.getenv("OBS_HOST", "localhost")
+OBS_PORT = int(os.getenv("OBS_PORT", 4455))
+OBS_PASSWORD = os.getenv("OBS_PASSWORD", "")
+
 # Models
 class Entry(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     weight = db.Column(db.Float, nullable=False, default=1)
     script_name = db.Column(db.String(100), nullable=True)
+    obs_action = db.Column(db.String(100), nullable=True)
     description = db.Column(db.String(100), nullable=True)
 
 class Settings(db.Model):
@@ -142,6 +153,52 @@ def on_message(connection, event):
             except (ValueError, IndexError):
                 print("Error parsing gifted subscription message.")
 
+def perform_obs_action(action, params=None):
+    """
+    Perform the specified OBS action using the WebSocket API.
+    """
+    if params is None:
+        params = {}
+
+    try:
+        # Connect to OBS WebSocket
+        ws = obsws(OBS_HOST, OBS_PORT, OBS_PASSWORD)
+        ws.connect()
+
+        if action == "StartStream":
+            ws.call(requests.StartStream())
+            print(f"Successfully started the stream with scene")
+
+        elif action == "StopStream":
+            ws.call(requests.StopStream())
+            print(f"Successfully stopped the stream")
+
+        else:
+            print(f"Unknown OBS action: {action}")
+
+        ws.disconnect()
+
+    except obswebsocket.exceptions.ConnectionFailure as e:
+        print(f"Failed to connect to OBS WebSocket: {e}")
+    except Exception as e:
+        print(f"Error performing OBS action: {e}")
+
+@app.route('/execute_obs_action', methods=['POST'])
+def execute_obs_action():
+    data = request.json
+    action = data.get("action", "").strip()
+
+    if not action:
+        return jsonify({"error": "OBS action is required"}), 400
+
+    try:
+        # Perform the OBS action
+        perform_obs_action(action)
+        return jsonify({"message": "OBS action executed successfully"}), 200
+    except Exception as e:
+        print(f"Error executing OBS action: {e}")
+        return jsonify({"error": str(e)}), 500
+    
 def get_twitch_username():
     """Fetch the Twitch username from the database."""
     global twitch_username
@@ -151,9 +208,9 @@ def get_twitch_username():
 
 def check_and_spin_wheel():
     """Check if total subs is a multiple of the Sub Count value and trigger the spin."""
-    global total_subs  # Ensure we're modifying the global variable
+    global total_subs
 
-    with app.app_context():  # Ensure we're in the app context
+    with app.app_context():
         setting = Settings.query.first()
         sub_count = setting.sub_count if setting and setting.sub_count else 3
 
@@ -168,8 +225,7 @@ def check_and_spin_wheel():
             print(f"Remaining subs after spin: {total_subs}")
 
 def spin_wheel():
-    """Simulate spinning the wheel and notify the client."""
-    with app.app_context():  # Ensure we're in the app context
+    with app.app_context():
         entries = Entry.query.all()
         if not entries:
             print("No entries on the wheel to spin.")
@@ -188,28 +244,24 @@ def spin_wheel():
 
         if selected_entry:
             print(f"The wheel landed on: {selected_entry.name}")
+
+            # Execute the Python script if present
             if selected_entry.script_name:
                 execute_script(selected_entry.script_name)
 
-            # Save the result to the spin_history database
-            try:
-                spin_history_entry = SpinHistory(
-                    result=selected_entry.name,
-                    timestamp=datetime.now()
-                )
-                db.session.add(spin_history_entry)
-                db.session.commit()
-                print(f"Spin history entry added: {spin_history_entry.result}")
-            except Exception as e:
-                print(f"Error saving spin history: {e}")
+            # Execute OBS action if present
+            if selected_entry.obs_action:
+                perform_obs_action(selected_entry.obs_action)
 
-            # Notify all clients that the spin is completed
-            socketio.emit("spin_completed", {
-                "result": selected_entry.name,
-                "timestamp": datetime.now().isoformat(),
-            })
+            # Save result to spin history
+            spin_history_entry = SpinHistory(result=selected_entry.name, timestamp=datetime.now())
+            db.session.add(spin_history_entry)
+            db.session.commit()
+
+            socketio.emit("spin_completed", {"result": selected_entry.name, "timestamp": datetime.now().isoformat()})
         else:
-            print("Something went wrong while spinning the wheel.")
+            print("Error determining the selected entry.")
+
 
 @socketio.on('spin_completed')
 def handle_spin_completed(data):
@@ -287,7 +339,7 @@ def wheel():
         entries=entries,
         twitch_username=twitch_username,
         green_screen_color=green_screen_color,
-        selected_sound=selected_sound  # Pass selected sound
+        selected_sound=selected_sound
     )
 
 @app.route('/settings', methods=['GET', 'POST'])
@@ -368,6 +420,7 @@ def manage():
         new_entry = request.form['entry']
         weight = request.form.get('weight', type=float)
         selected_script = request.form.get('script')
+        selected_obs_action = request.form.get('obs_action')
         description = request.form.get('description', '').strip()
 
         if not new_entry.strip():
@@ -376,8 +429,16 @@ def manage():
         if weight is None or weight <= 0:
             return "Weight must be a positive number", 400
 
-        # Add the new entry with the description
-        db.session.add(Entry(name=new_entry.strip(), weight=weight, script_name=selected_script, description=description))
+        # Add the new entry with the description and obs_action
+        db.session.add(
+            Entry(
+                name=new_entry.strip(),
+                weight=weight,
+                script_name=selected_script,
+                obs_action=selected_obs_action,
+                description=description,
+            )
+        )
         db.session.commit()
 
         # Emit a WebSocket event to notify clients of the update
@@ -534,6 +595,26 @@ def update_script(entry_id):
 
     return jsonify({"message": "Script updated successfully"}), 200
 
+@app.route('/update_obs_action/<int:entry_id>', methods=['POST'])
+def update_obs_action(entry_id):
+    data = request.json
+    obs_action = data.get("obs_action", "").strip()
+
+    # Restrict allowed actions to "StartStream" and "StopStream"
+    allowed_actions = ["StartStream", "StopStream"]
+    if obs_action and obs_action not in allowed_actions:
+        return jsonify({"error": "Invalid OBS action"}), 400
+
+    entry = Entry.query.get(entry_id)
+    if not entry:
+        return jsonify({"error": "Entry not found"}), 404
+
+    # Update the OBS action for the entry
+    entry.obs_action = obs_action if obs_action else None
+    db.session.commit()
+
+    return jsonify({"message": "OBS action updated successfully"}), 200
+
 @app.route('/custom_sounds/<path:filename>')
 def custom_sounds(filename):
     sound_dir = os.path.join(os.getcwd(), "custom_sounds")
@@ -556,7 +637,8 @@ def spin():
             'name': entry.name,
             'chance': (entry.weight / total_weight) * 100,
             'script': entry.script_name,
-            'description': entry.description
+            'description': entry.description,
+            'obsAction': entry.obs_action
         }
         for entry in entries
     ]

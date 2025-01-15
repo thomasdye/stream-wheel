@@ -10,17 +10,32 @@
     <h1>Manage Entries</h1>
     <form method="POST" class="entry-form">
         <input type="text" name="entry" placeholder="Add entry" maxlength="30" required>
-        <input type="number" class="entry-weight-input" name="weight" placeholder="Weight (e.g., 10 or 2.5)" step="any" min="0.1" required>
+        <input type="number" class="entry-weight-input no-spin" name="weight" placeholder="Weight (e.g., 10 or 2.5)" step="any" min="0.1" required>
+        
+        <!-- OBS Action Dropdown -->
+        <label for="obs-action" class="center-label">OBS Action</label>
+        <select name="obs_action">
+            <option value="" selected>None</option>
+            <option value="SwitchScene">Switch Scene</option>
+            <option value="ShowSource">Show Source</option>
+            <option value="HideSource">Hide Source</option>
+        </select>
+
+        <!-- Custom Script Dropdown -->
+        <label for="script" class="center-label">Custom Script</label>
         <select name="script">
             <option value="" selected>None</option>
             {% for script in scripts %}
             <option value="{{ script }}">{{ script }}</option>
             {% endfor %}
         </select>
+
         <textarea name="description" placeholder="Add a description..." maxlength="100"></textarea>
         <button class="add-btn" type="submit">Add</button>
     </form>
+    
     <div class="entries-grid">
+        {% if entries %}
         {% for entry in entries %}
         <div class="entry-box">
             <div>
@@ -31,21 +46,14 @@
                         value="{{ entry.name }}" 
                         data-id="{{ entry.id }}" 
                         maxlength="30" 
-                        placeholder="Edit title..."
-                    >
+                        placeholder="Edit title...">
                 </div>
                 <div class="script-info">
-                    <span class="script-label">Script: </span>
-                    <span 
-                        class="current-script" 
-                        data-id="{{ entry.id }}"
-                    >
+                    <span class="script-label">Script:</span>
+                    <span class="current-script" data-id="{{ entry.id }}">
                         {{ entry.script_name if entry.script_name else "None" }}
                     </span>
-                    <select 
-                        class="script-dropdown hidden" 
-                        data-id="{{ entry.id }}"
-                    >
+                    <select class="script-dropdown hidden" data-id="{{ entry.id }}">
                         <option value="" {% if not entry.script_name %}selected{% endif %}>None</option>
                         {% for script in scripts %}
                         <option value="{{ script }}" {% if script == entry.script_name %}selected{% endif %}>
@@ -53,7 +61,21 @@
                         </option>
                         {% endfor %}
                     </select>
-                </div>
+                
+                    <span class="obs-label">OBS Action:</span>
+                    <span class="current-obs-action" data-id="{{ entry.id }}">
+                        {{ entry.obs_action if entry.obs_action else "None" }}
+                    </span>
+                    <select class="obs-action-dropdown hidden" data-id="{{ entry.id }}">
+                        <option value="" {% if not entry.obs_action %}selected{% endif %}>None</option>
+                        <option value="StartStream" {% if entry.obs_action == "StartStream" %}selected{% endif %}>
+                            Start Stream
+                        </option>
+                        <option value="StopStream" {% if entry.obs_action == "StopStream" %}selected{% endif %}>
+                            Stop Stream
+                        </option>
+                    </select>
+                </div>                
                 <div class="entry-description">
                     <textarea 
                         class="description-input" 
@@ -71,21 +93,23 @@
                         value="{{ entry.weight }}" 
                         data-id="{{ entry.id }}" 
                         min="1"
-                    >
+                        >
                 </div>
                 <span class="percentage">(<span class="calculated-percentage">--</span>%)</span>
             </div>
-            
             <form method="POST" action="/delete/{{ entry.id }}">
                 <button class="delete-btn" type="submit">Delete</button>
             </form>
         </div>
         {% endfor %}
+        {% else %}
+        <p>No entries available. Add some entries to manage them here.</p>
+        {% endif %}
     </div>
     <a href="/">Back to Dashboard</a>
 
     <div id="toast" class="toast">Successfully updated weight</div>
-
+    
     <script src="static/js/manage.js"></script>
 </body>
 </html>
