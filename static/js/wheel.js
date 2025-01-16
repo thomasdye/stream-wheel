@@ -61,47 +61,6 @@ const canvas = document.getElementById('wheel');
             const greenScreenColor = overlay.dataset.color || "#00FF00";
             overlay.style.backgroundColor = greenScreenColor;
         });
-
-        document.addEventListener("DOMContentLoaded", () => {
-            const usernameForm = document.getElementById("username-form");
-            const usernameInput = document.getElementById("username-input");
-            const errorMessage = document.getElementById("error-message");
-        
-            usernameForm.addEventListener("submit", (event) => {
-                event.preventDefault();
-                const username = usernameInput.value.trim();
-        
-                fetch("/set_username", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                    body: new URLSearchParams({ username }),
-                })
-                    .then((response) => {
-                        // Handle HTTP errors explicitly
-                        if (!response.ok) {
-                            return response.json().then((data) => {
-                                throw new Error(data.error || "An error occurred");
-                            });
-                        }
-                        return response.json();
-                    })
-                    .then((data) => {
-                        if (data.error) {
-                            errorMessage.textContent = data.error;
-                            errorMessage.style.display = "block";
-                        } else {
-                            // Hide the username modal and refresh the wheel
-                            usernameModal.classList.add("hidden");
-                            populateWheel();
-                        }
-                    })
-                    .catch((error) => {
-                        console.error("Error setting username:", error);
-                        errorMessage.textContent = error.message || "An error occurred. Please try again.";
-                        errorMessage.style.display = "block";
-                    });
-            });
-        });
         
         async function populateSpinHistory() {
             try {
@@ -310,16 +269,27 @@ const canvas = document.getElementById('wheel');
             const modalChance = document.getElementById("modal-chance");
             const modalDescription = document.getElementById("modal-description");
         
+            const canvas = document.getElementById("wheel");
+        
             // Update modal content
             modalTitle.textContent = entryName;
             modalDescription.textContent = description;
             modalChance.textContent = `with a ${chance.toFixed(2)}% chance!`;
-        
-            // Set the background color of the modal
             modalContent.style.backgroundColor = color;
         
             // Show the modal
+            modal.style.display = "flex";
             modal.classList.add("show");
+        
+            // Adjust modal position after rendering
+            setTimeout(() => {
+                const canvasRect = canvas.getBoundingClientRect();
+                modal.style.position = "absolute";
+                modal.style.top = `${canvasRect.top}px`;
+                modal.style.left = `${canvasRect.left}px`;
+                modal.style.width = `${canvasRect.width}px`;
+                modal.style.height = `${canvasRect.height}px`;
+            }, 0);
         
             // Save the spin result to the backend
             fetch('/save_spin_result', {
@@ -344,6 +314,7 @@ const canvas = document.getElementById('wheel');
             // Hide modal after 10 seconds and execute custom script / OBS action
             setTimeout(() => {
                 modal.classList.remove("show");
+                modal.style.display = "none";
         
                 // Stop the spin sound when the modal closes
                 if (spinSound) {
@@ -366,7 +337,7 @@ const canvas = document.getElementById('wheel');
                 // Execute OBS action if present
                 if (obsAction) {
                     let bodyData = { action: obsAction };
-
+        
                     // Add obs_action_param and scene_name only when necessary
                     if (["ShowSource", "HideSource"].includes(obsAction)) {
                         fetch('/get_current_scene')
@@ -379,7 +350,7 @@ const canvas = document.getElementById('wheel');
                                     console.error("Error: Current scene is required but not available.");
                                     return;
                                 }
-
+        
                                 // Send the request
                                 fetch(`/execute_obs_action`, {
                                     method: "POST",
@@ -430,9 +401,9 @@ const canvas = document.getElementById('wheel');
                             })
                             .catch((error) => console.error("Error executing OBS action:", error));
                     }
-                }         
+                }
             }, 10000);
-        }              
+        }
         
         document.addEventListener("DOMContentLoaded", () => {
             const subCountDisplay = document.getElementById("sub-count-display");

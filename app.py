@@ -262,7 +262,7 @@ def get_twitch_username():
     """Fetch the Twitch username from the database."""
     global twitch_username
     setting = Settings.query.first()
-    twitch_username = setting.value if setting else "defaultusername"
+    twitch_username = setting.value if setting else ""
     print(f"Loaded Twitch username: {twitch_username}")
 
 def check_and_spin_wheel():

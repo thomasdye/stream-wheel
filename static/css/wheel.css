@@ -107,33 +107,11 @@ body {
     flex-direction: column;
     align-items: center;
     text-align: center;
-    padding: 40px;
 }
 
 canvas {
     border: 2px solid white;
     border-radius: 50%;
-}
-
-#spin-btn {
-    margin-top: 20px;
-    padding: 10px 20px;
-    background-color: #007bff;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 16px;
-    transition: background-color 0.2s ease;
-}
-
-#spin-btn:hover {
-    background-color: #0056b3;
-}
-
-#spin-btn:disabled {
-    background-color: #aaa;
-    cursor: not-allowed;
 }
 
 #indicator {
@@ -151,17 +129,13 @@ canvas {
     display: flex;
     justify-content: center;
     align-items: center;
+    margin: 0;
+    padding: 0;
 }
 
 #result-modal {
     display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.8);
-    color: white;
+    position: absolute;
     justify-content: center;
     align-items: center;
     z-index: 1000;
@@ -171,13 +145,19 @@ canvas {
     display: flex;
 }
 
+/* Center result content within the modal */
 #result-content {
-    text-align: center;
-    width: 300px;
-    padding: 20px;
-    border-radius: 10px;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background-color: rgba(18, 18, 18, 0.9);
     color: #ffffff;
-    transition: background-color 0.3s ease;
+    border-radius: 50%;
+    border: 2px solid #ffffff;
+    box-sizing: border-box;
 }
 
 #sub-count-display {
@@ -223,18 +203,26 @@ canvas {
 #modal-title {
     font-size: 32px;
     font-weight: bold;
-    color: white;
+    color: #ffffff;
     text-align: center;
     text-shadow: 1px 1px 3px black;
-    margin-bottom: 10px;
+    margin-bottom: 20px;
 }
 
-#modal-chance {
+#modal-description {
     font-size: 20px;
-    color: white;
+    color: #ffffff;
     text-align: center;
     text-shadow: 1px 1px 3px black;
     margin-top: 10px;
+}
+
+#modal-chance {
+    font-size: 24px;
+    color: #ffffff;
+    text-align: center;
+    text-shadow: 1px 1px 3px black;
+    margin-top: 15px;
 }
 
 #inactivity-overlay {
@@ -247,51 +235,6 @@ canvas {
     background-color: green;
     z-index: 9999;
     pointer-events: none;
-}
-
-.modal {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.8);
-    z-index: 9999;
-}
-
-.modal-content {
-    background-color: #1e1e1e;
-    padding: 20px;
-    border-radius: 10px;
-    text-align: center;
-    color: white;
-    width: 400px;
-}
-
-.modal-content input {
-    width: 90%;
-    padding: 10px;
-    margin: 10px 0;
-    border: 1px solid #333;
-    border-radius: 5px;
-    background-color: #2e2e2e;
-    color: white;
-}
-
-.modal-content button {
-    background-color: #007bff;
-    color: white;
-    padding: 10px 20px;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-}
-
-.modal-content button:hover {
-    background-color: #0056b3;
 }
 
 .hidden {
