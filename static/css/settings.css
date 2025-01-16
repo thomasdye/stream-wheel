@@ -211,3 +211,16 @@ label {
 #script-drop-zone.dragover {
     background-color: #444444;
 }
+
+input[type="password"] {
+    width: 50%;
+    padding: 10px;
+    margin: 10px auto;
+    border: 1px solid #333;
+    border-radius: 5px;
+    background-color: #2e2e2e;
+    color: #fff;
+    text-align: center;
+    display: block;
+    box-sizing: border-box;
+}

@@ -31,10 +31,6 @@ socketio = SocketIO(app)
 
 sub_count = 0
 
-OBS_HOST = os.getenv("OBS_HOST", "localhost")
-OBS_PORT = int(os.getenv("OBS_PORT", 4455))
-OBS_PASSWORD = os.getenv("OBS_PASSWORD", "")
-
 # Models
 class Entry(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -52,6 +48,9 @@ class Settings(db.Model):
     green_screen_color = db.Column(db.String(7), default="#00FF00")
     sub_count = db.Column(db.Integer, default=3)
     sound = db.Column(db.String(100), nullable=True)
+    obs_host = db.Column(db.String(100), default="localhost", nullable=False)
+    obs_port = db.Column(db.Integer, default=4455, nullable=False)
+    obs_password = db.Column(db.String(100), default="", nullable=True)
 
 class SpinHistory(db.Model):
     __bind_key__ = 'spin_history'
@@ -159,7 +158,13 @@ def perform_obs_action(action, params=None):
         params = {}
 
     try:
-        ws = obsws(OBS_HOST, OBS_PORT, OBS_PASSWORD)
+        # Fetch OBS settings from the database
+        setting = Settings.query.first()
+        obs_host = setting.obs_host if setting else "localhost"
+        obs_port = setting.obs_port if setting else 4455
+        obs_password = setting.obs_password if setting else ""
+
+        ws = obsws(obs_host, obs_port, obs_password)
         ws.connect()
 
         if action == "StartStream":
@@ -240,7 +245,13 @@ def execute_obs_action():
 def get_current_scene():
     try:
         # Connect to OBS WebSocket
-        ws = obsws(OBS_HOST, OBS_PORT, OBS_PASSWORD)
+        setting = Settings.query.first()
+        obs_host = setting.obs_host if setting else "localhost"
+        obs_port = setting.obs_port if setting else 4455
+        obs_password = setting.obs_password if setting else ""
+
+        # Connect to OBS WebSocket
+        ws = obsws(obs_host, obs_port, obs_password)
         ws.connect()
 
         # Call the API to get the current program scene
@@ -378,7 +389,47 @@ def dashboard():
         }
         for spin in spin_history
     ]
-    return render_template('dashboard.html', entries=entry_data, spin_history=history_data)
+
+    # Check if this is the first time running the application
+    is_first_time = Settings.query.first() is None
+
+    return render_template(
+        'dashboard.html',
+        entries=entry_data,
+        spin_history=history_data,
+        is_first_time=is_first_time
+    )
+
+@app.route('/initial_settings', methods=['POST'])
+def initial_settings():
+    """Save initial settings."""
+    twitch_username = request.form.get('twitch_username', '').strip()
+    sub_count = request.form.get('sub_count', type=int)
+    obs_host = request.form.get('obs_host', 'localhost').strip()
+    obs_port = request.form.get('obs_port', type=int)
+    obs_password = request.form.get('obs_password', '').strip()
+
+    if not twitch_username:
+        return jsonify({"error": "Twitch Username is required"}), 400
+    if not sub_count or sub_count < 1:
+        return jsonify({"error": "Subscribers to spin wheel must be a positive number"}), 400
+
+    # Save the settings in the database
+    setting = Settings(
+        value=twitch_username,
+        sub_count=sub_count,
+        obs_host=obs_host,
+        obs_port=obs_port,
+        obs_password=obs_password
+    )
+    db.session.add(setting)
+    db.session.commit()
+
+    # Update the global Twitch username and reconnect
+    twitch_username = twitch_username
+    reconnect_to_twitch_chat()
+
+    return jsonify({"message": "Initial settings saved successfully"}), 200
 
 @app.route('/wheel')
 def wheel():
@@ -410,6 +461,9 @@ def settings():
         green_screen_color = request.form.get('green_screen_color', '#00FF00').strip()
         sub_count = request.form.get('sub_count', type=int)
         selected_sound = request.form.get('sound', '').strip() or None
+        obs_host = request.form.get('obs_host', 'localhost').strip()
+        obs_port = request.form.get('obs_port', type=int)
+        obs_password = request.form.get('obs_password', '').strip()
 
         if not value:
             flash("Twitch Username cannot be empty", "error")
@@ -428,12 +482,18 @@ def settings():
             setting.green_screen_color = green_screen_color
             setting.sub_count = sub_count
             setting.sound = selected_sound
+            setting.obs_host = obs_host
+            setting.obs_port = obs_port
+            setting.obs_password = obs_password
         else:
             setting = Settings(
                 value=value,
                 green_screen_color=green_screen_color,
                 sub_count=sub_count,
-                sound=selected_sound
+                sound=selected_sound,
+                obs_host=obs_host,
+                obs_port=obs_port,
+                obs_password=obs_password
             )
             db.session.add(setting)
 
@@ -455,6 +515,9 @@ def settings():
     green_screen_color = setting.green_screen_color if setting else "#00FF00"
     sub_count = setting.sub_count if setting else 3
     selected_sound = setting.sound if setting and setting.sound else None
+    obs_host = setting.obs_host if setting else "localhost"
+    obs_port = setting.obs_port if setting else 4455
+    obs_password = setting.obs_password if setting else ""
 
     # Check if the selected sound still exists
     sounds = get_sounds()  # Fetch available sound files
@@ -470,7 +533,10 @@ def settings():
         green_screen_color=green_screen_color,
         sub_count=sub_count,
         sounds=sounds,
-        selected_sound=selected_sound
+        selected_sound=selected_sound,
+        obs_host=obs_host,
+        obs_port=obs_port,
+        obs_password=obs_password
     )
 
 @app.route('/manage', methods=['GET', 'POST'])

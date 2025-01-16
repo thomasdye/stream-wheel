@@ -59,6 +59,33 @@
                     <input type="file" id="script-input" accept=".py" hidden>
                 </div>
             </div>
+            <label for="obs_host">OBS Host</label>
+            <input
+                type="text"
+                id="obs_host"
+                name="obs_host"
+                value="{{ obs_host }}"
+                maxlength="100"
+                required
+            >
+
+            <label for="obs_port">OBS Port</label>
+            <input
+                type="number"
+                id="obs_port"
+                name="obs_port"
+                value="{{ obs_port if obs_port else 4455 }}"
+                min="1"
+                required
+            >
+
+            <label for="obs_password">OBS Password</label>
+            <input
+                type="password"
+                id="obs_password"
+                name="obs_password"
+                value="{{ obs_password }}"
+            >
             <button type="submit">Save Settings</button>
         </form>
         <a href="/">Back to Dashboard</a>
