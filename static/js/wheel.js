@@ -268,7 +268,6 @@ const canvas = document.getElementById('wheel');
             const modalTitle = document.getElementById("modal-title");
             const modalChance = document.getElementById("modal-chance");
             const modalDescription = document.getElementById("modal-description");
-        
             const canvas = document.getElementById("wheel");
         
             // Update modal content
@@ -277,25 +276,35 @@ const canvas = document.getElementById('wheel');
             modalChance.textContent = `with a ${chance.toFixed(2)}% chance!`;
             modalContent.style.backgroundColor = color;
         
+            // Reset text animations
+            modalTitle.style.animation = "none";
+            modalDescription.style.animation = "none";
+            modalChance.style.animation = "none";
+        
+            // Trigger text animations after a delay
+            setTimeout(() => {
+                modalTitle.style.animation = "zoomIn 0.5s ease-out forwards";
+                modalDescription.style.animation = "zoomIn 0.5s ease-out forwards";
+                modalChance.style.animation = "zoomIn 0.5s ease-out forwards";
+            }, 500); // Delay ensures modal background expands first
+        
             // Show the modal
             modal.style.display = "flex";
             modal.classList.add("show");
         
-            // Adjust modal position after rendering
-            setTimeout(() => {
-                const canvasRect = canvas.getBoundingClientRect();
-                modal.style.position = "absolute";
-                modal.style.top = `${canvasRect.top}px`;
-                modal.style.left = `${canvasRect.left}px`;
-                modal.style.width = `${canvasRect.width}px`;
-                modal.style.height = `${canvasRect.height}px`;
-            }, 0);
+            // Get canvas dimensions and position modal accurately
+            const canvasRect = canvas.getBoundingClientRect();
+            const size = canvasRect.width; // Assuming a square canvas
+            modalContent.style.width = `${size}px`;
+            modalContent.style.height = `${size}px`;
+            modalContent.style.left = `${canvasRect.left + size / 2}px`;
+            modalContent.style.top = `${canvasRect.top + size / 2}px`;
         
             // Save the spin result to the backend
             fetch('/save_spin_result', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ result: entryName })
+                body: JSON.stringify({ result: entryName }),
             })
                 .then(response => {
                     if (!response.ok) {
@@ -311,7 +320,7 @@ const canvas = document.getElementById('wheel');
                     console.error("Error saving spin result:", error);
                 });
         
-            // Hide modal after 10 seconds and execute custom script / OBS action
+            // Hide modal after 10 seconds
             setTimeout(() => {
                 modal.classList.remove("show");
                 modal.style.display = "none";
@@ -328,81 +337,59 @@ const canvas = document.getElementById('wheel');
                     timestamp: new Date().toISOString(),
                 });
         
+                // Execute OBS action immediately after modal closes
+                executeObsAction(obsAction, obsActionParam);
+        
                 // Execute custom script if present
                 if (scriptName) {
                     fetch(`/execute_script/${scriptName}`, { method: "POST" })
                         .catch(error => console.error("Error executing script:", error));
                 }
-        
-                // Execute OBS action if present
-                if (obsAction) {
-                    let bodyData = { action: obsAction };
-        
-                    // Add obs_action_param and scene_name only when necessary
-                    if (["ShowSource", "HideSource"].includes(obsAction)) {
-                        fetch('/get_current_scene')
-                            .then((response) => response.json())
-                            .then((data) => {
-                                if (data.current_scene) {
-                                    bodyData.scene_name = data.current_scene;
-                                    bodyData.obs_action_param = obsActionParam;
-                                } else {
-                                    console.error("Error: Current scene is required but not available.");
-                                    return;
-                                }
-        
-                                // Send the request
-                                fetch(`/execute_obs_action`, {
-                                    method: "POST",
-                                    headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify(bodyData),
-                                })
-                                    .then((response) => {
-                                        if (!response.ok) {
-                                            return response.text().then((errorText) => {
-                                                throw new Error(`Server error: ${errorText}`);
-                                            });
-                                        }
-                                        console.log("OBS action executed successfully!");
-                                    })
-                                    .catch((error) => console.error("Error executing OBS action:", error));
-                            })
-                            .catch((error) => console.error("Error fetching current scene:", error));
-                    } else if (["SwitchScene", "ShowScene"].includes(obsAction)) {
-                        bodyData.scene_name = obsActionParam; // Use obsActionParam as the scene name
-                        fetch(`/execute_obs_action`, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify(bodyData),
-                        })
-                            .then((response) => {
-                                if (!response.ok) {
-                                    return response.text().then((errorText) => {
-                                        throw new Error(`Server error: ${errorText}`);
-                                    });
-                                }
-                                console.log("OBS action executed successfully!");
-                            })
-                            .catch((error) => console.error("Error executing OBS action:", error));
-                    } else {
-                        // For StartStream and StopStream
-                        fetch(`/execute_obs_action`, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify(bodyData),
-                        })
-                            .then((response) => {
-                                if (!response.ok) {
-                                    return response.text().then((errorText) => {
-                                        throw new Error(`Server error: ${errorText}`);
-                                    });
-                                }
-                                console.log("OBS action executed successfully!");
-                            })
-                            .catch((error) => console.error("Error executing OBS action:", error));
-                    }
-                }
             }, 10000);
+        }                   
+
+        function executeObsAction(obsAction, obsActionParam) {
+            if (!obsAction) return;
+        
+            let bodyData = { action: obsAction };
+        
+            if (["ShowSource", "HideSource"].includes(obsAction)) {
+                fetch('/get_current_scene')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.current_scene) {
+                            bodyData.scene_name = data.current_scene;
+                            bodyData.obs_action_param = obsActionParam;
+        
+                            sendObsActionRequest(bodyData);
+                        } else {
+                            console.error("Error: Current scene is required but not available.");
+                        }
+                    })
+                    .catch(error => console.error("Error fetching current scene:", error));
+            } else if (["SwitchScene", "ShowScene"].includes(obsAction)) {
+                bodyData.scene_name = obsActionParam;
+                sendObsActionRequest(bodyData);
+            } else {
+                sendObsActionRequest(bodyData);
+            }
+        }
+
+        function sendObsActionRequest(bodyData) {
+            fetch(`/execute_obs_action`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(bodyData),
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.text().then(errorText => {
+                            throw new Error(`Server error: ${errorText}`);
+                        });
+                    }
+                    console.log("OBS action executed successfully!");
+                })
+                .catch(error => console.error("Error executing OBS action:", error));
         }
         
         document.addEventListener("DOMContentLoaded", () => {

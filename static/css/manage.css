@@ -52,11 +52,20 @@ input[type="number"].entry-weight-input {
 
 .entries-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
     gap: 20px;
     justify-content: center;
     width: 100%;
     max-width: 1200px;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+.entries-grid p {
+    font-size: 18px;
+    font-weight: bold;
+    color: #aaaaaa;
+    margin: 0;
 }
 
 .entry-box {
