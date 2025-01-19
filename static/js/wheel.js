@@ -17,6 +17,11 @@ const canvas = document.getElementById('wheel');
             console.log("Socket connected on wheel page!");
         });
 
+        socket.on('reload_wheel', () => {
+            console.log('Settings changed, reloading wheel page...');
+            window.location.reload();
+        });
+
         socket.on("trigger_spin", () => {
             console.log("Spin triggered from the dashboard!");
         
@@ -29,6 +34,10 @@ const canvas = document.getElementById('wheel');
                 if (soundUrl) {
                     if (!spinSound) {
                         spinSound = new Audio(soundUrl);
+                        // Add support for different audio formats
+                        spinSound.addEventListener('error', (e) => {
+                            console.error("Error loading spin sound:", e);
+                        });
                     }
                     spinSound.play().catch((error) => {
                         console.error("Error playing spin sound:", error);
@@ -102,6 +111,7 @@ const canvas = document.getElementById('wheel');
             } else {
                 drawWheel();
                 populateKey();
+                resizeWheel();
             }
         }
     
@@ -320,7 +330,7 @@ const canvas = document.getElementById('wheel');
                     console.error("Error saving spin result:", error);
                 });
         
-            // Hide modal after 10 seconds
+            // Hide modal and reset state after 10 seconds
             setTimeout(() => {
                 modal.classList.remove("show");
                 modal.style.display = "none";
@@ -443,4 +453,31 @@ const canvas = document.getElementById('wheel');
             window.location.href = '/manage';
         }
     
+        function resizeWheel() {
+            const canvas = document.getElementById('wheel');
+            
+            // If window width is less than 800px, make it responsive
+            if (window.innerWidth < 800) {
+                const newSize = Math.min(window.innerWidth * 0.9, 800);
+                canvas.style.width = `${newSize}px`;
+                canvas.style.height = `${newSize}px`;
+            } else {
+                // Otherwise use fixed size
+                canvas.style.width = '800px';
+                canvas.style.height = '800px';
+            }
+            
+            // Maintain internal canvas resolution
+            canvas.width = 800;
+            canvas.height = 800;
+            
+            // Redraw the wheel
+            if (segments.length > 0) {
+                drawWheel();
+            }
+        }
+
+        // Add resize event listener
+        window.addEventListener('resize', resizeWheel);
+
         populateWheel();

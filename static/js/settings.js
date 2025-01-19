@@ -1,3 +1,6 @@
+// Initialize socket connection
+const socket = io();
+
 // Variables for custom sound upload
 const soundDropZone = document.getElementById('drop-zone');
 const soundInput = document.getElementById('file-input');
@@ -64,20 +67,60 @@ scriptInput.addEventListener('change', async () => {
     }
 });
 
-function showToast(message, category) {
-    let toastContainer = document.getElementById('server-toast-container');
-    if (!toastContainer) {
-        toastContainer = document.createElement('div');
-        toastContainer.id = 'server-toast-container';
-        document.body.appendChild(toastContainer);
-    }
+document.addEventListener('DOMContentLoaded', () => {
+    const settingsForm = document.getElementById('settings-form');
 
+    settingsForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const formData = new FormData(settingsForm);
+        
+        try {
+            const response = await fetch('/settings', {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (response.ok) {
+                showToast('Settings saved successfully!', 'success');
+                // Emit socket event to notify wheel page
+                socket.emit('settings_changed');
+                // Wait for toast to be visible before redirecting
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 2000);
+            } else {
+                const data = await response.json();
+                showToast(data.error || 'Error saving settings', 'error');
+            }
+        } catch (error) {
+            showToast('Error saving settings', 'error');
+            console.error('Error:', error);
+        }
+    });
+
+    // Add keypress handler for enter key on inputs
+    const inputs = settingsForm.querySelectorAll('input, select');
+    inputs.forEach(input => {
+        input.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                settingsForm.dispatchEvent(new Event('submit'));
+            }
+        });
+    });
+});
+
+// Update the existing showToast function to use the new toast-container
+function showToast(message, type = 'success') {
+    const toastContainer = document.getElementById('toast-container');
     const toast = document.createElement('div');
-    toast.className = `toast ${category}`;
+    toast.className = `toast ${type}`;
     toast.textContent = message;
-
+    
     toastContainer.appendChild(toast);
-
+    
+    // Remove the toast after 3 seconds
     setTimeout(() => {
         toast.remove();
     }, 3000);
@@ -85,8 +128,19 @@ function showToast(message, category) {
 
 // Function to upload sound file
 async function uploadSound(file) {
-    if (!['audio/mpeg', 'audio/wav'].includes(file.type)) {
-        showToast('Only .mp3 and .wav files are allowed.', 'error');
+    // Common audio formats
+    const allowedTypes = [
+        'audio/mpeg',        // .mp3
+        'audio/wav',         // .wav
+        'audio/x-wav',       // Alternative MIME type for .wav
+        'audio/ogg',         // .ogg
+        'audio/aac',         // .aac
+        'audio/m4a',         // .m4a
+        'audio/x-m4a'        // Alternative MIME type for .m4a
+    ];
+
+    if (!allowedTypes.includes(file.type)) {
+        showToast('Only .mp3, .wav, .ogg, .aac and .m4a files are allowed.', 'error');
         return;
     }
 
@@ -114,8 +168,8 @@ async function uploadSound(file) {
 
 // Function to upload Python script
 async function uploadScript(file) {
-    if (!file.name.endsWith('.py')) {
-        showToast('Only .py files are allowed.', 'error');
+    if (!file.name.endsWith('.py') && !file.name.endsWith('.js')) {
+        showToast('Only .py and .js files are allowed.', 'error');
         return;
     }
 

@@ -5,11 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Settings</title>
     <link rel="stylesheet" href="static/css/settings.css">
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
 </head>
 <body>
     <div id="settings-container">
         <h2>Settings</h2>
-        <form method="POST" action="/settings">
+        <form method="POST" action="/settings" id="settings-form">
             <label for="setting_value">Twitch Username</label>
             <input
                 type="text"
@@ -53,10 +54,10 @@
                 </div>
             </div>
             <div id="upload-script-container" style="margin-top: 20px;">
-                <label for="script-input">Upload Custom Python Script</label>
+                <label for="script-input">Upload Custom Script</label>
                 <div id="script-drop-zone" class="drop-zone">
-                    <p>Drag & drop .py files or <span id="script-file-select">click to browse</span></p>
-                    <input type="file" id="script-input" accept=".py" hidden>
+                    <p>Drag & drop .py or .js files or <span id="script-file-select">click to browse</span></p>
+                    <input type="file" id="script-input" accept=".py,.js" hidden>
                 </div>
             </div>
             <label for="obs_host">OBS Host</label>
@@ -90,6 +91,7 @@
         </form>
         <a href="/">Back to Dashboard</a>
     </div>
+    <div id="toast-container"></div>
     <script src="static/js/settings.js" defer></script>
 </body>
 </html>

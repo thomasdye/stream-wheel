@@ -14,6 +14,8 @@ from eventlet import wsgi
 from obswebsocket import obsws, requests
 import obswebsocket
 from dotenv import load_dotenv
+from sqlalchemy import func
+import socket
 
 # Load environment variables from .env file
 load_dotenv()
@@ -44,7 +46,7 @@ class Entry(db.Model):
 class Settings(db.Model):
     __bind_key__ = 'settings'
     id = db.Column(db.Integer, primary_key=True)
-    value = db.Column(db.String(20), nullable=False)
+    twitch_username = db.Column(db.String(100), nullable=False)
     green_screen_color = db.Column(db.String(7), default="#00FF00")
     sub_count = db.Column(db.Integer, default=3)
     sound = db.Column(db.String(100), nullable=True)
@@ -62,6 +64,7 @@ class SpinHistory(db.Model):
 twitch_username = None
 twitch_connection = None
 twitch_reactor = None
+wheel_spinning = False
 
 # Global variable to track total subscriptions
 total_subs = 0
@@ -74,84 +77,105 @@ def notify_settings_updated():
 def notify_entries_updated():
     socketio.emit("entries_updated")
 
-# Read from Twitch chat
 def connect_to_twitch_chat():
-    """Connect to Twitch IRC and listen for messages."""
-    global twitch_username, twitch_connection, twitch_reactor
+    """Connect to Twitch chat using the stored username."""
+    global irc, twitch_username
 
+    # Use app context when accessing the database
+    with app.app_context():
+        # Get username from settings
+        setting = Settings.query.first()
+        if not setting or not setting.twitch_username:
+            print("No Twitch username configured")
+            return
+
+        twitch_username = setting.twitch_username.lower()  # Ensure lowercase for Twitch IRC
+    
     try:
-        reactor = irc.client.Reactor()
-        twitch_reactor = reactor
-        connection = reactor.server()
-        twitch_connection = connection
-        connection.connect("irc.chat.twitch.tv", 6667, "justinfan12345")
-        connection.add_global_handler("welcome", on_connect, 0)
-        connection.add_global_handler("pubmsg", on_message, 0)
-        reactor.process_forever()
-    except irc.client.ServerConnectionError as e:
+        # Initialize IRC connection
+        irc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        irc.connect(('irc.chat.twitch.tv', 6667))
+        
+        # Send Twitch IRC registration commands
+        irc.send(f'NICK justinfan12345\r\n'.encode())  # Anonymous connection
+        irc.send('CAP REQ :twitch.tv/commands twitch.tv/tags twitch.tv/membership\r\n'.encode())
+        irc.send(f'JOIN #{twitch_username}\r\n'.encode())
+        
+        print(f"Connected to Twitch chat channel: #{twitch_username}")
+        
+        # Start the message receiving thread
+        threading.Thread(target=receive_messages, daemon=True).start()
+    except Exception as e:
         print(f"Error connecting to Twitch chat: {e}")
 
+def receive_messages():
+    """Receive and process messages from Twitch chat."""
+    global irc, total_subs
+    
+    while True:
+        try:
+            data = irc.recv(2048).decode('utf-8')
+            if not data:
+                print("Lost connection to Twitch chat. Attempting to reconnect...")
+                reconnect_to_twitch_chat()
+                continue
+
+            # Handle Twitch PING/PONG to keep connection alive
+            if 'PING :tmi.twitch.tv' in data:
+                irc.send('PONG :tmi.twitch.tv\r\n'.encode())
+                continue
+
+            # Process Streamlabs subscription notifications
+            if "PRIVMSG" in data:
+                try:
+                    # Extract username and message
+                    username = data.split('!')[0][1:]
+                    message = data.split('PRIVMSG')[1].split(':', 1)[1].strip()
+
+                    # Only process Streamlabs messages
+                    if username.lower() == "streamlabs":
+                        if "just subscribed with" in message.lower():
+                            total_subs += 1
+                            print(f"New subscription detected! Total subs: {total_subs}")
+                            with app.app_context():
+                                sub_count = Settings.query.first().sub_count
+                            check_and_spin_wheel()
+                            socketio.emit("sub_count_updated", {"current_subs": total_subs, "total_subs": sub_count})
+
+                        elif "just gifted" in message.lower() and "tier 1 subscriptions" in message.lower():
+                            try:
+                                amount = int(message.split("just gifted")[1].split("Tier 1")[0].strip())
+                                total_subs += amount
+                                print(f"{amount} gifted subscriptions detected! Total subs: {total_subs}")
+                                with app.app_context():
+                                    sub_count = Settings.query.first().sub_count
+                                check_and_spin_wheel()
+                                socketio.emit("sub_count_updated", {"current_subs": total_subs, "total_subs": sub_count})
+                            except (ValueError, IndexError):
+                                print("Error parsing gifted subscription message.")
+
+                except Exception as e:
+                    print(f"Error processing message: {e}")
+
+        except Exception as e:
+            print(f"Error receiving message: {e}")
+            # Attempt to reconnect on error
+            reconnect_to_twitch_chat()
+            continue
+
 def reconnect_to_twitch_chat():
-    """Reconnect to Twitch IRC with the updated username."""
-    global twitch_connection, twitch_reactor, twitch_username
-
-    # Stop the previous reactor process if any
-    if twitch_reactor:
+    """Reconnect to Twitch chat with updated username."""
+    global irc
+    
+    # Close existing connection if it exists
+    if irc:
         try:
-            print("Stopping previous Twitch reactor...")
-            twitch_reactor._running = False
-            twitch_reactor.disconnect_all()  # Ensure all connections are disconnected
-            twitch_reactor = None
-        except Exception as e:
-            print(f"Error stopping previous Twitch reactor: {e}")
-
-    # Disconnect from the previous connection, if any
-    if twitch_connection:
-        try:
-            print("Disconnecting from Twitch chat...")
-            twitch_connection.close()  # Close the connection explicitly
-            twitch_connection = None
-        except Exception as e:
-            print(f"Error disconnecting from Twitch chat: {e}")
-
-    # Reconnect with the new username
-    try:
-        print(f"Reconnecting to Twitch chat with username: {twitch_username}")
-        threading.Thread(target=connect_to_twitch_chat, daemon=True).start()
-    except Exception as e:
-        print(f"Error reconnecting to Twitch chat: {e}")
-
-def on_connect(connection, event):
-    global twitch_username
-    print("Connected to Twitch IRC")
-    connection.join(f"#{twitch_username}")
-    print(f"Joined channel: #{twitch_username}")
-
-def on_message(connection, event):
-    global total_subs
-    user = event.source.split("!")[0]
-    message = event.arguments[0]
-
-    if user.lower() == "streamlabs":
-        if "just subscribed with" in message.lower():
-            total_subs += 1
-            print(f"New subscription detected! Total subs: {total_subs}")
-            with app.app_context():
-                sub_count = Settings.query.first().sub_count
-            check_and_spin_wheel()
-            socketio.emit("sub_count_updated", {"current_subs": total_subs, "total_subs": sub_count})
-
-        elif "just gifted" in message.lower() and "tier 1 subscriptions" in message.lower():
-            try:
-                amount = int(message.split("just gifted")[1].split("Tier 1")[0].strip())
-                total_subs += amount
-                print(f"{amount} gifted subscriptions detected! Total subs: {total_subs}")
-                with app.app_context():
-                    sub_count = Settings.query.first().sub_count
-                check_and_spin_wheel()
-                socketio.emit("sub_count_updated", {"current_subs": total_subs, "total_subs": sub_count})
-            except (ValueError, IndexError):
-                print("Error parsing gifted subscription message.")
+            irc.close()
+        except:
+            pass
+    
+    # Reconnect with new username
+    connect_to_twitch_chat()
 
 def perform_obs_action(action, params=None):
     if params is None:
@@ -215,66 +239,11 @@ def perform_obs_action(action, params=None):
         print(f"Failed to connect to OBS WebSocket: {e}")
     except Exception as e:
         print(f"Error performing OBS action: {e}")
-
-@app.route('/execute_obs_action', methods=['POST'])
-def execute_obs_action():
-    data = request.json
-    action = data.get("action", "").strip()
-    scene_name = data.get("scene_name", "").strip()
-    obs_action_param = data.get("obs_action_param", "").strip()
-
-    # Validate action
-    if not action:
-        return jsonify({"error": "Action is required"}), 400
-
-    # Validate based on action type
-    if action in ["ShowSource", "HideSource"] and (not scene_name or not obs_action_param):
-        return jsonify({"error": "Scene name and source name are required for this action"}), 400
-    elif action in ["SwitchScene", "ShowScene"] and not scene_name:
-        return jsonify({"error": "Scene name is required for this action"}), 400
-
-    try:
-        # Perform the OBS action with the parameters
-        perform_obs_action(action, {"scene_name": scene_name, "obs_action_param": obs_action_param})
-        return jsonify({"message": "OBS action executed successfully"}), 200
-    except Exception as e:
-        print(f"Error executing OBS action: {e}")
-        return jsonify({"error": str(e)}), 500
-    
-@app.route('/get_current_scene', methods=['GET'])
-def get_current_scene():
-    try:
-        # Connect to OBS WebSocket
-        setting = Settings.query.first()
-        obs_host = setting.obs_host if setting else "localhost"
-        obs_port = setting.obs_port if setting else 4455
-        obs_password = setting.obs_password if setting else ""
-
-        # Connect to OBS WebSocket
-        ws = obsws(obs_host, obs_port, obs_password)
-        ws.connect()
-
-        # Call the API to get the current program scene
-        current_scene_response = ws.call(requests.GetCurrentProgramScene())
-
-        # Use the correct method to retrieve the current scene name
-        current_scene_name = current_scene_response.getSceneName()
-        ws.disconnect()
-
-        return jsonify({"current_scene": current_scene_name}), 200
-    except obswebsocket.exceptions.ConnectionFailure as e:
-        print(f"Failed to connect to OBS WebSocket: {e}")
-        return jsonify({"error": "Failed to connect to OBS WebSocket"}), 500
-    except Exception as e:
-        print(f"Error retrieving current scene: {e}")
-        return jsonify({"error": str(e)}), 500
     
 def get_twitch_username():
-    """Fetch the Twitch username from the database."""
-    global twitch_username
-    setting = Settings.query.first()
-    twitch_username = setting.value if setting else ""
-    print(f"Loaded Twitch username: {twitch_username}")
+    """Get the Twitch username from settings."""
+    setting = Settings.query.first()  # Get the first (and should be only) settings record
+    return setting.twitch_username if setting else ""
 
 def check_and_spin_wheel():
     """Check if total subs is a multiple of the Sub Count value and trigger the spin."""
@@ -338,6 +307,8 @@ def handle_spin_completed(data):
     """
     Receive spin_completed event from the wheel and broadcast it to dashboard clients.
     """
+    global wheel_spinning
+    wheel_spinning = False
     print(f"Spin completed with result: {data}")
     
     # Emit the spin result to all connected clients
@@ -350,14 +321,20 @@ def get_scripts():
     script_dir = os.path.join(os.getcwd(), "custom_scripts")
     if not os.path.exists(script_dir):
         os.makedirs(script_dir)
-    return [f for f in os.listdir(script_dir) if f.endswith(".py")]
+    return [f for f in os.listdir(script_dir) if f.endswith((".py", ".js"))]
 
 def execute_script(script_name):
     script_path = os.path.join(os.getcwd(), "custom_scripts", script_name)
-    if os.path.exists(script_path):
-        subprocess.run(["python", script_path], check=True)
-    else:
+    if not os.path.exists(script_path):
         print(f"Script {script_name} not found!")
+        return
+        
+    if script_name.endswith('.py'):
+        subprocess.run(["python", script_path], check=True)
+    elif script_name.endswith('.js'):
+        subprocess.run(["node", script_path], check=True)
+    else:
+        print(f"Unsupported script type: {script_name}")
 
 def get_sounds():
     """Fetch all .mp3 and .wav files from the /custom_sounds/ directory."""
@@ -366,80 +343,118 @@ def get_sounds():
         os.makedirs(sound_dir)
     return [f for f in os.listdir(sound_dir) if f.endswith((".mp3", ".wav"))]
 
+def get_available_scripts():
+    """Get list of available script files from the custom_scripts directory."""
+    scripts_dir = os.path.join(os.path.dirname(__file__), 'custom_scripts')
+    if not os.path.exists(scripts_dir):
+        os.makedirs(scripts_dir)
+    
+    scripts = []
+    for file in os.listdir(scripts_dir):
+        if file.endswith(('.py', '.js')):
+            scripts.append(file)
+    return sorted(scripts)
+
+def get_available_sounds():
+    """Get list of available sound files from the custom_sounds directory."""
+    sounds_dir = os.path.join(os.path.dirname(__file__), 'custom_sounds')
+    if not os.path.exists(sounds_dir):
+        os.makedirs(sounds_dir)
+    
+    sounds = []
+    for file in os.listdir(sounds_dir):
+        if file.endswith(('.mp3', '.wav', '.ogg', '.m4a')):
+            sounds.append(file)
+    return sorted(sounds)
+
+def get_most_common_result():
+    """Get the most common result from spin history."""
+    result = (
+        db.session.query(
+            SpinHistory.result,
+            func.count(SpinHistory.result).label('count')
+        )
+        .group_by(SpinHistory.result)
+        .order_by(func.count(SpinHistory.result).desc())
+        .first()
+    )
+    
+    return result[0] if result else "No spins yet"
+
 @app.route('/')
 def dashboard():
-    """Render the dashboard page."""
+    # Check if settings exist
+    settings = Settings.query.first()
+    is_first_time = settings is None or not settings.twitch_username
+
+    # Get entries and calculate chances
     entries = Entry.query.all()
     total_weight = sum(entry.weight for entry in entries)
-    entry_data = [
-        {
-            'name': entry.name,
-            'chance': (entry.weight / total_weight) * 100 if total_weight > 0 else 0
-        }
-        for entry in entries
-    ]
+    
+    # Calculate chance for each entry
+    for entry in entries:
+        entry.chance = (entry.weight / total_weight * 100) if total_weight > 0 else 0
+
+    # Get available scripts
+    scripts = get_available_scripts()
     spin_history = SpinHistory.query.order_by(SpinHistory.timestamp.desc()).limit(10).all()
-    history_data = [
-        {
-            'result': spin.result,
-            'timestamp': f"{spin.timestamp.strftime('%m').lstrip('0')}/"
-                         f"{spin.timestamp.strftime('%d').lstrip('0')}/"
-                         f"{spin.timestamp.strftime('%y')} - "
-                         f"{spin.timestamp.strftime('%I').lstrip('0')}:{spin.timestamp.strftime('%M%p')}"
-        }
-        for spin in spin_history
-    ]
+    most_common_result = get_most_common_result()
+    total_spins = SpinHistory.query.count()
+    
+    twitch_username = settings.twitch_username if settings else ""
+    sub_count = settings.sub_count if settings else 3
+    selected_sound = settings.sound if settings else None
 
-    # Check if this is the first time running the application
-    is_first_time = Settings.query.first() is None
+    return render_template('dashboard.html',
+                         entries=entries,
+                         scripts=scripts,
+                         spin_history=spin_history,
+                         most_common_result=most_common_result,
+                         total_spins=total_spins,
+                         twitch_username=twitch_username,
+                         sub_count=sub_count,
+                         selected_sound=selected_sound,
+                         is_first_time=is_first_time)
 
-    return render_template(
-        'dashboard.html',
-        entries=entry_data,
-        spin_history=history_data,
-        is_first_time=is_first_time
-    )
-
-@app.route('/initial_settings', methods=['POST'])
-def initial_settings():
-    """Save initial settings."""
-    twitch_username = request.form.get('twitch_username', '').strip()
-    sub_count = request.form.get('sub_count', type=int)
-    obs_host = request.form.get('obs_host', 'localhost').strip()
-    obs_port = request.form.get('obs_port', type=int)
-    obs_password = request.form.get('obs_password', '').strip()
-
-    if not twitch_username:
-        return jsonify({"error": "Twitch Username is required"}), 400
-    if not sub_count or sub_count < 1:
-        return jsonify({"error": "Subscribers to spin wheel must be a positive number"}), 400
-
-    # Save the settings in the database
-    setting = Settings(
-        value=twitch_username,
-        sub_count=sub_count,
-        obs_host=obs_host,
-        obs_port=obs_port,
-        obs_password=obs_password
-    )
-    db.session.add(setting)
-    db.session.commit()
-
-    # Update the global Twitch username and reconnect
-    twitch_username = twitch_username
-    reconnect_to_twitch_chat()
-
-    return jsonify({"message": "Initial settings saved successfully"}), 200
+@app.route('/save_initial_settings', methods=['POST'])
+def save_initial_settings():
+    try:
+        data = request.get_json()
+        
+        # Create new settings or get existing
+        settings = Settings.query.first()
+        if not settings:
+            settings = Settings(
+                twitch_username=data.get('twitch_username'),
+                sub_count=int(data.get('sub_count', 3)),
+                obs_host=data.get('obs_host', 'localhost'),
+                obs_port=int(data.get('obs_port', 4455)),
+                obs_password=data.get('obs_password', '')
+            )
+            db.session.add(settings)
+        else:
+            settings.twitch_username = data.get('twitch_username')
+            settings.sub_count = int(data.get('sub_count', 3))
+            settings.obs_host = data.get('obs_host', 'localhost')
+            settings.obs_port = int(data.get('obs_port', 4455))
+            settings.obs_password = data.get('obs_password', '')
+        
+        db.session.commit()
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/wheel')
 def wheel():
     """Render the wheel page."""
-    global twitch_username
-
     # Fetch settings
     setting = Settings.query.first()
     green_screen_color = setting.green_screen_color if setting else "#00FF00"
     selected_sound = setting.sound if setting and setting.sound else None
+    
+    # Get the twitch username from settings
+    display_username = setting.twitch_username if setting and setting.twitch_username else "Streamer"
 
     # Fetch entries
     entries = Entry.query.all()
@@ -447,135 +462,94 @@ def wheel():
     return render_template(
         'wheel.html',
         entries=entries,
-        twitch_username=twitch_username,
+        twitch_username=display_username,
         green_screen_color=green_screen_color,
         selected_sound=selected_sound
     )
 
 @app.route('/settings', methods=['GET', 'POST'])
 def settings():
-    global twitch_username
+    setting = Settings.query.first()
+    sounds = get_available_sounds()
 
     if request.method == 'POST':
-        value = request.form.get('setting_value', '').strip()
-        green_screen_color = request.form.get('green_screen_color', '#00FF00').strip()
-        sub_count = request.form.get('sub_count', type=int)
-        selected_sound = request.form.get('sound', '').strip() or None
-        obs_host = request.form.get('obs_host', 'localhost').strip()
-        obs_port = request.form.get('obs_port', type=int)
-        obs_password = request.form.get('obs_password', '').strip()
-
-        if not value:
-            flash("Twitch Username cannot be empty", "error")
-            return redirect(url_for('settings'))
-        if len(value) > 20:
-            flash("Twitch Username cannot exceed 20 characters", "error")
-            return redirect(url_for('settings'))
-        if not sub_count or sub_count < 1:
-            flash("Sub Count must be a positive number", "error")
-            return redirect(url_for('settings'))
-
-        # Save or update the settings in the database
-        setting = Settings.query.first()
-        if setting:
-            setting.value = value
-            setting.green_screen_color = green_screen_color
-            setting.sub_count = sub_count
-            setting.sound = selected_sound
-            setting.obs_host = obs_host
-            setting.obs_port = obs_port
-            setting.obs_password = obs_password
-        else:
-            setting = Settings(
-                value=value,
-                green_screen_color=green_screen_color,
-                sub_count=sub_count,
-                sound=selected_sound,
-                obs_host=obs_host,
-                obs_port=obs_port,
-                obs_password=obs_password
-            )
+        if not setting:
+            setting = Settings()
             db.session.add(setting)
 
+        setting.twitch_username = request.form.get('setting_value')
+        setting.green_screen_color = request.form.get('green_screen_color', '#00FF00')
+        setting.sub_count = int(request.form.get('sub_count', 3))
+        setting.sound = request.form.get('sound')
+        setting.obs_host = request.form.get('obs_host', 'localhost')
+        setting.obs_port = int(request.form.get('obs_port', 4455))
+        setting.obs_password = request.form.get('obs_password', '')
+
         db.session.commit()
-
-        # Update the global Twitch username and reconnect
-        get_twitch_username()
-        reconnect_to_twitch_chat()
-
-        # Emit a WebSocket event to notify clients of the update
-        socketio.emit("settings_updated")
-
-        flash(f"Settings updated successfully!", "success")
         return redirect(url_for('settings'))
 
-    # Fetch the current settings to display
-    setting = Settings.query.first()
-    current_value = setting.value if setting else ""
-    green_screen_color = setting.green_screen_color if setting else "#00FF00"
-    sub_count = setting.sub_count if setting else 3
-    selected_sound = setting.sound if setting and setting.sound else None
-    obs_host = setting.obs_host if setting else "localhost"
-    obs_port = setting.obs_port if setting else 4455
-    obs_password = setting.obs_password if setting else ""
+    return render_template('settings.html',
+                         current_value=setting.twitch_username if setting else "",
+                         green_screen_color=setting.green_screen_color if setting else "#00FF00",
+                         sub_count=setting.sub_count if setting else 3,
+                         sounds=sounds,
+                         selected_sound=setting.sound if setting else None,
+                         obs_host=setting.obs_host if setting else "localhost",
+                         obs_port=setting.obs_port if setting else 4455,
+                         obs_password=setting.obs_password if setting else "")
 
-    # Check if the selected sound still exists
-    sounds = get_sounds()  # Fetch available sound files
-    if selected_sound and selected_sound not in sounds:
-        selected_sound = None  # Reset the sound if it no longer exists
-        if setting:
-            setting.sound = None
-            db.session.commit()
+@app.route('/execute_obs_action', methods=['POST'])
+def execute_obs_action():
+    data = request.json
+    action = data.get("action", "").strip()
+    scene_name = data.get("scene_name", "").strip()
+    obs_action_param = data.get("obs_action_param", "").strip()
 
-    return render_template(
-        'settings.html',
-        current_value=current_value,
-        green_screen_color=green_screen_color,
-        sub_count=sub_count,
-        sounds=sounds,
-        selected_sound=selected_sound,
-        obs_host=obs_host,
-        obs_port=obs_port,
-        obs_password=obs_password
-    )
+    # Validate action
+    if not action:
+        return jsonify({"error": "Action is required"}), 400
 
-@app.route('/manage', methods=['GET', 'POST'])
-def manage():
-    if request.method == 'POST':
-        new_entry = request.form['entry']
-        weight = request.form.get('weight', type=float)
-        selected_script = request.form.get('script')
-        selected_obs_action = request.form.get('obs_action')
-        obs_action_param = request.form.get('obs_action_param')
-        description = request.form.get('description', '').strip()
+    # Validate based on action type
+    if action in ["ShowSource", "HideSource"] and (not scene_name or not obs_action_param):
+        return jsonify({"error": "Scene name and source name are required for this action"}), 400
+    elif action in ["SwitchScene", "ShowScene"] and not scene_name:
+        return jsonify({"error": "Scene name is required for this action"}), 400
 
-        if not new_entry.strip():
-            return "Entry name cannot be empty", 400
+    try:
+        # Perform the OBS action with the parameters
+        perform_obs_action(action, {"scene_name": scene_name, "obs_action_param": obs_action_param})
+        return jsonify({"message": "OBS action executed successfully"}), 200
+    except Exception as e:
+        print(f"Error executing OBS action: {e}")
+        return jsonify({"error": str(e)}), 500
+    
+@app.route('/get_current_scene', methods=['GET'])
+def get_current_scene():
+    try:
+        # Connect to OBS WebSocket
+        setting = Settings.query.first()
+        obs_host = setting.obs_host if setting else "localhost"
+        obs_port = setting.obs_port if setting else 4455
+        obs_password = setting.obs_password if setting else ""
 
-        if weight is None or weight <= 0:
-            return "Weight must be a positive number", 400
+        # Connect to OBS WebSocket
+        ws = obsws(obs_host, obs_port, obs_password)
+        ws.connect()
 
-        # Add the new entry with the description and obs_action
-        db.session.add(
-            Entry(
-                name=new_entry.strip(),
-                weight=weight,
-                script_name=selected_script,
-                obs_action=selected_obs_action,
-                obs_action_param=obs_action_param,
-                description=description,
-            )
-        )
-        db.session.commit()
+        # Call the API to get the current program scene
+        current_scene_response = ws.call(requests.GetCurrentProgramScene())
 
-        # Emit a WebSocket event to notify clients of the update
-        socketio.emit("entries_updated")
+        # Use the correct method to retrieve the current scene name
+        current_scene_name = current_scene_response.getSceneName()
+        ws.disconnect()
 
-        return redirect(url_for('manage'))
-
-    entries = Entry.query.all()
-    scripts = get_scripts()
-    return render_template('manage.html', entries=entries, scripts=scripts)
+        return jsonify({"current_scene": current_scene_name}), 200
+    except obswebsocket.exceptions.ConnectionFailure as e:
+        print(f"Failed to connect to OBS WebSocket: {e}")
+        return jsonify({"error": "Failed to connect to OBS WebSocket"}), 500
+    except Exception as e:
+        print(f"Error retrieving current scene: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/set_username', methods=['POST'])
 def set_username():
@@ -630,8 +604,9 @@ def upload_script():
     if not file:
         return jsonify({"message": "No file provided", "scripts": []}), 400
     
-    if not file.filename.endswith('.py'):
-        return jsonify({"message": "Only .py files are allowed", "scripts": []}), 400
+    # Check for allowed file extensions
+    if not file.filename.endswith(('.py', '.js')):
+        return jsonify({"message": "Only .py and .js files are allowed", "scripts": []}), 400
 
     script_dir = os.path.join(os.getcwd(), "custom_scripts")
     if not os.path.exists(script_dir):
@@ -796,6 +771,11 @@ def spin():
 @app.route('/trigger_spin', methods=['POST'])
 def trigger_spin():
     """Endpoint to trigger a spin."""
+    global wheel_spinning
+    if wheel_spinning:
+        return "Wheel is already spinning", 400
+    
+    wheel_spinning = True
     print("Spin triggered!")
     socketio.emit("trigger_spin")
     return "Spin triggered", 200
@@ -840,15 +820,7 @@ def save_spin_result():
 def run_script(script_name):
     execute_script(script_name)
     return "Script executed!", 200
-
-@app.route('/delete/<int:id>', methods=['POST'])
-def delete(id):
-    entry = Entry.query.get(id)
-    if entry:
-        db.session.delete(entry)
-        db.session.commit()
-    return redirect(url_for('manage'))
-
+    
 # Ensure databases are initialized
 with app.app_context():
     db.create_all()
@@ -860,6 +832,77 @@ with app.app_context():
     sub_count = setting.sub_count if setting else 3
     socketio.emit("sub_count_updated", {"current_subs": total_subs, "total_subs": sub_count})
     print(f"Emitted sub_count_updated: {total_subs} / {sub_count}")
+
+# Add new endpoint to check wheel state
+@app.route('/wheel_state', methods=['GET'])
+def get_wheel_state():
+    """Return the current state of the wheel."""
+    return jsonify({"spinning": wheel_spinning})
+
+@app.route('/add_entry', methods=['POST'])
+def add_entry():
+    """Add a new entry to the wheel."""
+    try:
+        data = request.get_json()
+        new_entry = Entry(
+            name=data['name'],
+            weight=data['weight'],
+            script_name=data['script_name'] if data['script_name'] else None,
+            obs_action=data['obs_action'] if data['obs_action'] else None,
+            obs_action_param=data['obs_action_param'] if data['obs_action_param'] else None,
+            description=data['description'] if data['description'] else None
+        )
+        db.session.add(new_entry)
+        db.session.commit()
+
+        # Emit socket event to reload wheel
+        socketio.emit('reload_wheel')
+
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+@app.route('/update_entry/<int:entry_id>', methods=['POST'])
+def update_entry(entry_id):
+    try:
+        data = request.get_json()
+        entry = db.session.get(Entry, entry_id)
+        
+        if not entry:
+            return jsonify({'success': False, 'error': 'Entry not found'}), 404
+            
+        entry.name = data['name']
+        entry.weight = data['weight']
+        entry.script_name = data['script_name'] if data['script_name'] else None
+        entry.obs_action = data['obs_action'] if data['obs_action'] else None
+        entry.obs_action_param = data['obs_action_param'] if data['obs_action_param'] else None
+        
+        db.session.commit()
+        
+        socketio.emit("entries_updated")
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/delete/<int:id>', methods=['POST'])
+def delete(id):
+    """Delete an entry from the database."""
+    try:
+        entry = db.session.get(Entry, id)
+        if entry:
+            db.session.delete(entry)
+            db.session.commit()
+            socketio.emit("entries_updated")
+            return jsonify({"success": True})
+        return jsonify({"success": False, "error": "Entry not found"}), 404
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@socketio.on('settings_changed')
+def handle_settings_change():
+    """Broadcast settings change to all clients"""
+    socketio.emit('reload_wheel')
 
 if __name__ == '__main__':
     threading.Thread(target=connect_to_twitch_chat, daemon=True).start()

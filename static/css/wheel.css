@@ -7,6 +7,7 @@ body {
     justify-content: center;
     align-items: center;
     height: 100vh;
+    overflow: hidden;
 }
 
 #main-container {
@@ -18,6 +19,8 @@ body {
     width: 100%;
     max-width: 1200px;
     margin: 0 auto;
+    padding: 20px;
+    box-sizing: border-box;
 }
 
 #key, #center-container, #spin-history {
@@ -80,12 +83,12 @@ body {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 15px;
-    padding: 5px 20px; /* Added padding for left and right */
+    padding: 5px 20px;
     background-color: #2e2e2e;
     border-radius: 8px;
     word-break: break-word;
-    width: 400px; /* Fixed width */
-    height: 50px; /* Fixed height */
+    width: 400px;
+    height: 50px;
     box-sizing: border-box;
 }
 
@@ -110,6 +113,8 @@ body {
 }
 
 canvas {
+    width: 800px;
+    height: 800px;
     border: 2px solid white;
     border-radius: 50%;
 }
@@ -255,15 +260,35 @@ canvas {
     display: none;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1200px) {
     #main-container {
-        grid-template-columns: 1fr;
-        grid-template-rows: auto;
+        gap: 10px;
     }
 
-    #key, #center-container, #spin-history {
-        align-items: center;
-        text-align: center;
+    #key li,
+    #spin-history li {
+        width: 300px;
+    }
+}
+
+@media (max-width: 800px) {
+    #main-container {
+        grid-template-columns: 1fr;
+    }
+
+    #key, #spin-history {
+        display: none;
+    }
+
+    #center-container {
+        width: 100%;
+    }
+
+    canvas {
+        width: 90vw;
+        height: 90vw;
+        max-width: 800px;
+        max-height: 800px;
     }
 }
 
