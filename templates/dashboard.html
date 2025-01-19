@@ -15,7 +15,7 @@
             <div class="header-content">
                 <h1>Wheel Dashboard</h1>
                 <div class="header-actions">
-                    <a href="/settings" class="icon-btn" title="Settings">
+                    <a href="#" class="icon-btn" title="Settings" onclick="openSettingsModal(); return false;">
                         <i class="fas fa-gear"></i>
                     </a>
                     <a href="/wheel" target="_blank" class="icon-btn" title="Open Wheel">
@@ -142,7 +142,7 @@
                     {% if not entries %}No Entries Available{% else %}Trigger Spin{% endif %}
                 </button>
             </div>
-            <div id="initial-settings-modal" class="modal {% if is_first_time %}show{% endif %}">
+            <div id="initial-settings-modal" class="modal {% if is_first_time %}modal-show{% endif %}">
                 <div class="modal-content">
                     <h2>Initial Setup</h2>
                     <form id="initial-settings-form">
@@ -202,6 +202,61 @@
                 <div class="modal-buttons">
                     <button type="submit" class="add-btn">Add Entry</button>
                     <button type="button" class="cancel-btn" onclick="closeModal()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="modal" id="settings-modal">
+        <div class="modal-content">
+            <h2>Settings</h2>
+            <form id="settings-form">
+                <label for="twitch_username">Twitch Username</label>
+                <input type="text" id="twitch_username" name="twitch_username" value="{{ twitch_username }}" required>
+                
+                <label for="green_screen_color">Green Screen Color</label>
+                <input type="color" id="green_screen_color" name="green_screen_color" value="{{ green_screen_color }}">
+                
+                <label for="sub_count">Required Subscribers</label>
+                <input type="number" id="sub_count" name="sub_count" value="{{ sub_count }}" min="1" required>
+                
+                <label for="sound">Wheel Spin Sound</label>
+                <select id="sound" name="sound">
+                    <option value="" {% if not selected_sound %}selected{% endif %}>None</option>
+                    {% for sound in sounds %}
+                        <option value="{{ sound }}" {% if sound == selected_sound %}selected{% endif %}>
+                            {{ sound }}
+                        </option>
+                    {% endfor %}
+                </select>
+
+                <div id="upload-container">
+                    <label>Upload Custom Sound</label>
+                    <div id="drop-zone" class="drop-zone">
+                        <p>Drag & drop .mp3 or .wav or <span id="file-select">click to browse</span></p>
+                        <input type="file" id="file-input" accept=".mp3, .wav" hidden>
+                    </div>
+                </div>
+
+                <div id="upload-script-container">
+                    <label>Upload Custom Script</label>
+                    <div id="script-drop-zone" class="drop-zone">
+                        <p>Drag & drop .py or .js files or <span id="script-file-select">click to browse</span></p>
+                        <input type="file" id="script-input" accept=".py,.js" hidden>
+                    </div>
+                </div>
+
+                <label for="obs_host">OBS Host</label>
+                <input type="text" id="obs_host" name="obs_host" value="{{ obs_host }}" required>
+                
+                <label for="obs_port">OBS Port</label>
+                <input type="number" id="obs_port" name="obs_port" value="{{ obs_port }}" min="1" required>
+                
+                <label for="obs_password">OBS Password</label>
+                <input type="password" id="obs_password" name="obs_password" value="{{ obs_password }}">
+                
+                <div class="modal-buttons">
+                    <button type="submit" class="save-btn">Save Settings</button>
+                    <button type="button" class="cancel-btn" onclick="closeSettingsModal()">Cancel</button>
                 </div>
             </form>
         </div>

@@ -375,53 +375,48 @@ def get_most_common_result():
     
     return result[0] if result else "No spins yet"
 
-def get_setting(key):
-    """Get a setting value from the database."""
-    setting = Settings.query.first()  # Using the Settings class that's already defined in app.py
-    if key == 'twitch_username':
-        return setting.twitch_username if setting else None
-    elif key == 'sub_count':
-        return setting.sub_count if setting else 3
-    elif key == 'selected_sound':
-        return setting.sound if setting else None
-    return None
+def ensure_directories_exist():
+    """Create necessary directories if they don't exist."""
+    directories = [
+        'static/custom_sounds',
+        'static/custom_scripts',
+        'custom_scripts',
+        'custom_sounds'
+    ]
+    for directory in directories:
+        if not os.path.exists(directory):
+            os.makedirs(directory)
 
 @app.route('/')
 def dashboard():
     """Render the dashboard page."""
     entries = Entry.query.all()
-    spin_history = SpinHistory.query.order_by(SpinHistory.timestamp.desc()).limit(10).all()
+    settings = Settings.query.first()
     
     # Calculate percentages for entries
     total_weight = sum(entry.weight for entry in entries)
     for entry in entries:
         entry.chance_percent = (entry.weight / total_weight * 100) if total_weight > 0 else 0
     
-    # Format the timestamps for the template
-    formatted_history = [{
-        'result': spin.result,
-        'timestamp': spin.timestamp.strftime("%#m/%#d/%y - %#I:%M%p") if os.name == 'nt' else spin.timestamp.strftime("%-m/%-d/%y - %-I:%M%p")
-    } for spin in spin_history]
+    # Get sounds for the dropdown
+    sounds = get_available_sounds()
     
-    # Calculate statistics
+    # Calculate total spins and most common result
     total_spins = SpinHistory.query.count()
-    
-    # Get most common result using SQL
-    most_common = db.session.query(
-        SpinHistory.result,
-        func.count(SpinHistory.result).label('count')
-    ).group_by(SpinHistory.result).order_by(func.count(SpinHistory.result).desc()).first()
-    
-    most_common_result = most_common[0] if most_common else "No spins yet"
+    most_common_result = get_most_common_result()
     
     return render_template('dashboard.html',
                          entries=entries,
-                         spin_history=formatted_history,
-                         twitch_username=get_setting('twitch_username'),
-                         sub_count=get_setting('sub_count'),
-                         selected_sound=get_setting('selected_sound'),
+                         twitch_username=settings.twitch_username if settings else "",
+                         sub_count=settings.sub_count if settings else 3,
+                         selected_sound=settings.sound if settings else None,
+                         sounds=sounds,
                          scripts=get_available_scripts(),
-                         is_first_time=not get_setting('twitch_username'),
+                         green_screen_color=settings.green_screen_color if settings else "#00FF00",
+                         obs_host=settings.obs_host if settings else "localhost",
+                         obs_port=settings.obs_port if settings else 4455,
+                         obs_password=settings.obs_password if settings else "",
+                         is_first_time=not settings or not settings.twitch_username,
                          total_spins=total_spins,
                          most_common_result=most_common_result)
 
@@ -475,37 +470,6 @@ def wheel():
         green_screen_color=green_screen_color,
         selected_sound=selected_sound
     )
-
-@app.route('/settings', methods=['GET', 'POST'])
-def settings():
-    setting = Settings.query.first()
-    sounds = get_available_sounds()
-
-    if request.method == 'POST':
-        if not setting:
-            setting = Settings()
-            db.session.add(setting)
-
-        setting.twitch_username = request.form.get('setting_value')
-        setting.green_screen_color = request.form.get('green_screen_color', '#00FF00')
-        setting.sub_count = int(request.form.get('sub_count', 3))
-        setting.sound = request.form.get('sound')
-        setting.obs_host = request.form.get('obs_host', 'localhost')
-        setting.obs_port = int(request.form.get('obs_port', 4455))
-        setting.obs_password = request.form.get('obs_password', '')
-
-        db.session.commit()
-        return redirect(url_for('settings'))
-
-    return render_template('settings.html',
-                         current_value=setting.twitch_username if setting else "",
-                         green_screen_color=setting.green_screen_color if setting else "#00FF00",
-                         sub_count=setting.sub_count if setting else 3,
-                         sounds=sounds,
-                         selected_sound=setting.sound if setting else None,
-                         obs_host=setting.obs_host if setting else "localhost",
-                         obs_port=setting.obs_port if setting else 4455,
-                         obs_password=setting.obs_password if setting else "")
 
 @app.route('/execute_obs_action', methods=['POST'])
 def execute_obs_action():
@@ -844,6 +808,8 @@ def run_script(script_name):
     
 # Ensure databases are initialized
 with app.app_context():
+    ensure_directories_exist()
+    db.drop_all()
     db.create_all()
     get_twitch_username()
 
@@ -924,6 +890,35 @@ def delete(id):
 def handle_settings_change():
     """Broadcast settings change to all clients"""
     socketio.emit('reload_wheel')
+
+@app.route('/settings', methods=['POST'])
+def save_settings():
+    try:
+        data = request.get_json()
+        
+        # Get existing settings or create new
+        settings = Settings.query.first()
+        if not settings:
+            settings = Settings()
+            db.session.add(settings)
+        
+        # Update settings with form data
+        settings.twitch_username = data.get('twitch_username')
+        settings.green_screen_color = data.get('green_screen_color')
+        settings.sub_count = int(data.get('sub_count', 3))
+        settings.sound = data.get('sound')
+        settings.obs_host = data.get('obs_host', 'localhost')
+        settings.obs_port = int(data.get('obs_port', 4455))
+        settings.obs_password = data.get('obs_password', '')
+        
+        db.session.commit()
+        
+        # Notify clients of settings change
+        socketio.emit('settings_updated')
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
 
 if __name__ == '__main__':
     threading.Thread(target=connect_to_twitch_chat, daemon=True).start()

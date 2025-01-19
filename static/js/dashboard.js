@@ -1,3 +1,108 @@
+// Move these functions outside of DOMContentLoaded
+function openSettingsModal() {
+    document.getElementById('settings-modal').classList.add('show');
+}
+
+function closeSettingsModal() {
+    document.getElementById('settings-modal').classList.remove('show');
+}
+
+function showToast(message, type = 'info') {
+    // Create toast container if it doesn't exist
+    let container = document.querySelector('.toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.className = 'toast-container';
+        document.body.appendChild(container);
+    }
+
+    // Create toast element
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.innerHTML = `
+        <span>${message}</span>
+    `;
+
+    // Add to container
+    container.appendChild(toast);
+
+    // Remove toast after 3 seconds
+    setTimeout(() => {
+        toast.style.animation = 'fadeOut 0.3s ease-in-out forwards';
+        setTimeout(() => {
+            container.removeChild(toast);
+            if (container.children.length === 0) {
+                document.body.removeChild(container);
+            }
+        }, 300);
+    }, 3000);
+}
+
+// Add file upload handling functions
+function handleFileUpload(file, type) {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const endpoint = type === 'sound' ? '/upload_sound' : '/upload_script';
+    console.log(`Uploading ${type} file:`, file.name);
+
+    fetch(endpoint, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        const successMessage = type === 'sound' 
+            ? `Sound file "${file.name}" uploaded successfully!`
+            : `Script "${file.name}" uploaded successfully!`;
+        showToast(successMessage, 'success');
+        
+        if (type === 'sound') {
+            updateSoundDropdown(data.sounds);
+        } else {
+            updateScriptDropdown(data.scripts);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        const errorMessage = type === 'sound'
+            ? `Error uploading sound file "${file.name}"`
+            : `Error uploading script "${file.name}"`;
+        showToast(errorMessage, 'error');
+    });
+}
+
+function updateSoundDropdown(sounds) {
+    const dropdown = document.getElementById('sound');
+    const currentValue = dropdown.value;
+    dropdown.innerHTML = '<option value="">None</option>';
+    sounds.forEach(sound => {
+        const option = document.createElement('option');
+        option.value = sound;
+        option.textContent = sound;
+        dropdown.appendChild(option);
+    });
+    if (sounds.includes(currentValue)) {
+        dropdown.value = currentValue;
+    }
+}
+
+function updateScriptDropdown(scripts) {
+    const dropdown = document.getElementById('script-select');
+    const currentValue = dropdown.value;
+    dropdown.innerHTML = '<option value="">None</option>';
+    scripts.forEach(script => {
+        const option = document.createElement('option');
+        option.value = script;
+        option.textContent = script;
+        dropdown.appendChild(option);
+    });
+    if (scripts.includes(currentValue)) {
+        dropdown.value = currentValue;
+    }
+}
+
+// Main DOMContentLoaded event listener
 document.addEventListener("DOMContentLoaded", () => {
     const triggerSpinBtn = document.getElementById("trigger-spin-btn");
     const socket = io();
@@ -5,6 +110,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const entryForm = document.getElementById('entry-form');
     const obsActionSelect = document.getElementById('obs-action-select');
     const initialSettingsForm = document.getElementById('initial-settings-form');
+    const settingsForm = document.getElementById('settings-form');
 
     let isEditMode = false;
 
@@ -75,20 +181,6 @@ document.addEventListener("DOMContentLoaded", () => {
         const formattedMinutes = minutes < 10 ? '0' + minutes : minutes;
         
         return `${hours}:${formattedMinutes}${ampm}`;
-    }
-
-    function showToast(message, type = "success") {
-        const toastContainer = document.getElementById("toast-container");
-        const toast = document.createElement("div");
-        toast.className = `toast ${type}`;
-        toast.textContent = message;
-
-        toastContainer.appendChild(toast);
-
-        // Remove the toast after 3 seconds
-        setTimeout(() => {
-            toast.remove();
-        }, 3000);
     }
 
     // Modal functions
@@ -261,7 +353,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     };
 
-    // Add this to your existing DOMContentLoaded event listener
+    // Update the initial settings form handler
     if (initialSettingsForm) {
         initialSettingsForm.addEventListener('submit', function(e) {
             e.preventDefault();
@@ -284,8 +376,12 @@ document.addEventListener("DOMContentLoaded", () => {
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    document.getElementById('initial-settings-modal').classList.remove('show');
-                    showToast('Settings saved successfully');
+                    document.getElementById('initial-settings-modal').classList.remove('modal-show');
+                    // Store the toast message before reload
+                    localStorage.setItem('pendingToast', JSON.stringify({
+                        message: 'Initial settings saved successfully!',
+                        type: 'success'
+                    }));
                     window.location.reload();
                 } else {
                     showToast('Error saving settings: ' + data.error, 'error');
@@ -347,4 +443,177 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Call on page load
     updateEditButton();
+
+    // Update the settings form handler
+    if (settingsForm) {
+        settingsForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(settingsForm);
+            
+            // Convert FormData to JSON object
+            const jsonData = {
+                twitch_username: formData.get('twitch_username'),
+                green_screen_color: formData.get('green_screen_color'),
+                sub_count: formData.get('sub_count'),
+                sound: formData.get('sound'),
+                obs_host: formData.get('obs_host'),
+                obs_port: formData.get('obs_port'),
+                obs_password: formData.get('obs_password')
+            };
+
+            try {
+                const response = await fetch('/settings', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(jsonData)
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Store toast message before reload
+                    localStorage.setItem('pendingToast', JSON.stringify({
+                        message: 'Settings saved successfully!',
+                        type: 'success'
+                    }));
+                    closeSettingsModal();
+                    window.location.reload();
+                } else {
+                    showToast(data.error || 'Error saving settings', 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showToast('Error saving settings', 'error');
+            }
+        });
+    }
+
+    // Make modal functions available globally
+    window.openSettingsModal = openSettingsModal;
+    window.closeSettingsModal = closeSettingsModal;
+
+    // File upload elements
+    const soundDropZone = document.getElementById('drop-zone');
+    const soundInput = document.getElementById('file-input');
+    const scriptDropZone = document.getElementById('script-drop-zone');
+    const scriptInput = document.getElementById('script-input');
+    const fileSelect = document.getElementById('file-select');
+    const scriptFileSelect = document.getElementById('script-file-select');
+
+    console.log('File upload elements:', {
+        soundDropZone: !!soundDropZone,
+        soundInput: !!soundInput,
+        scriptDropZone: !!scriptDropZone,
+        scriptInput: !!scriptInput,
+        fileSelect: !!fileSelect,
+        scriptFileSelect: !!scriptFileSelect
+    });
+
+    // Sound upload handling
+    if (soundDropZone && soundInput && fileSelect) {
+        // Prevent default drag behaviors
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            soundDropZone.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false);
+        });
+
+        // Highlight drop zone when item is dragged over it
+        ['dragenter', 'dragover'].forEach(eventName => {
+            soundDropZone.addEventListener(eventName, () => {
+                soundDropZone.classList.add('dragover');
+            });
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            soundDropZone.addEventListener(eventName, () => {
+                soundDropZone.classList.remove('dragover');
+            });
+        });
+
+        soundDropZone.addEventListener('drop', (e) => {
+            const file = e.dataTransfer.files[0];
+            if (file && file.name.match(/\.(mp3|wav)$/i)) {
+                handleFileUpload(file, 'sound');
+            } else {
+                showToast('Please upload an MP3 or WAV file', 'error');
+            }
+        });
+
+        // Handle click to upload
+        fileSelect.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Click to upload sound');
+            soundInput.click();
+        });
+
+        soundInput.addEventListener('change', () => {
+            const file = soundInput.files[0];
+            if (file) {
+                handleFileUpload(file, 'sound');
+            }
+        });
+    }
+
+    // Script upload handling
+    if (scriptDropZone && scriptInput && scriptFileSelect) {
+        // Prevent default drag behaviors
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            scriptDropZone.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false);
+        });
+
+        // Highlight drop zone when item is dragged over it
+        ['dragenter', 'dragover'].forEach(eventName => {
+            scriptDropZone.addEventListener(eventName, () => {
+                scriptDropZone.classList.add('dragover');
+            });
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            scriptDropZone.addEventListener(eventName, () => {
+                scriptDropZone.classList.remove('dragover');
+            });
+        });
+
+        scriptDropZone.addEventListener('drop', (e) => {
+            const file = e.dataTransfer.files[0];
+            if (file && file.name.match(/\.(py|js)$/i)) {
+                handleFileUpload(file, 'script');
+            } else {
+                showToast('Please upload a Python or JavaScript file', 'error');
+            }
+        });
+
+        // Handle click to upload
+        scriptFileSelect.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Click to upload script');
+            scriptInput.click();
+        });
+
+        scriptInput.addEventListener('change', () => {
+            const file = scriptInput.files[0];
+            if (file) {
+                handleFileUpload(file, 'script');
+            }
+        });
+    }
+
+    // Check for any pending toast messages
+    const pendingToast = localStorage.getItem('pendingToast');
+    if (pendingToast) {
+        const toastData = JSON.parse(pendingToast);
+        showToast(toastData.message, toastData.type);
+        localStorage.removeItem('pendingToast');
+    }
 });
+
+// Prevent defaults for drag and drop
+function preventDefaults(e) {
+    e.preventDefault();
+    e.stopPropagation();
+}
