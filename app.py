@@ -311,6 +311,20 @@ def handle_spin_completed(data):
     wheel_spinning = False
     print(f"Spin completed with result: {data}")
     
+    # Execute script if present
+    script_name = data.get("scriptName")
+    if script_name:
+        execute_script(script_name)
+    
+    # Execute OBS action if present
+    obs_action = data.get("obsAction")
+    obs_action_param = data.get("obsActionParam")
+    if obs_action:
+        perform_obs_action(obs_action, {
+            "scene_name": obs_action_param if obs_action in ["SwitchScene", "ShowScene"] else None,
+            "obs_action_param": obs_action_param if obs_action in ["ShowSource", "HideSource"] else None
+        })
+    
     # Emit the spin result to all connected clients
     socketio.emit("spin_completed", {
         "result": data.get("result"),
@@ -381,40 +395,55 @@ def get_most_common_result():
     
     return result[0] if result else "No spins yet"
 
+def get_setting(key):
+    """Get a setting value from the database."""
+    setting = Settings.query.first()  # Using the Settings class that's already defined in app.py
+    if key == 'twitch_username':
+        return setting.twitch_username if setting else None
+    elif key == 'sub_count':
+        return setting.sub_count if setting else 3
+    elif key == 'selected_sound':
+        return setting.sound if setting else None
+    return None
+
 @app.route('/')
 def dashboard():
-    # Check if settings exist
-    settings = Settings.query.first()
-    is_first_time = settings is None or not settings.twitch_username
-
-    # Get entries and calculate chances
+    """Render the dashboard page."""
     entries = Entry.query.all()
-    total_weight = sum(entry.weight for entry in entries)
-    
-    # Calculate chance for each entry
-    for entry in entries:
-        entry.chance = (entry.weight / total_weight * 100) if total_weight > 0 else 0
-
-    # Get available scripts
-    scripts = get_available_scripts()
     spin_history = SpinHistory.query.order_by(SpinHistory.timestamp.desc()).limit(10).all()
-    most_common_result = get_most_common_result()
+    
+    # Calculate percentages for entries
+    total_weight = sum(entry.weight for entry in entries)
+    for entry in entries:
+        entry.chance_percent = (entry.weight / total_weight * 100) if total_weight > 0 else 0
+    
+    # Format the timestamps for the template
+    formatted_history = [{
+        'result': spin.result,
+        'timestamp': spin.timestamp.strftime("%#m/%#d/%y - %#I:%M%p") if os.name == 'nt' else spin.timestamp.strftime("%-m/%-d/%y - %-I:%M%p")
+    } for spin in spin_history]
+    
+    # Calculate statistics
     total_spins = SpinHistory.query.count()
     
-    twitch_username = settings.twitch_username if settings else ""
-    sub_count = settings.sub_count if settings else 3
-    selected_sound = settings.sound if settings else None
-
+    # Get most common result using SQL
+    most_common = db.session.query(
+        SpinHistory.result,
+        func.count(SpinHistory.result).label('count')
+    ).group_by(SpinHistory.result).order_by(func.count(SpinHistory.result).desc()).first()
+    
+    most_common_result = most_common[0] if most_common else "No spins yet"
+    
     return render_template('dashboard.html',
                          entries=entries,
-                         scripts=scripts,
-                         spin_history=spin_history,
-                         most_common_result=most_common_result,
+                         spin_history=formatted_history,
+                         twitch_username=get_setting('twitch_username'),
+                         sub_count=get_setting('sub_count'),
+                         selected_sound=get_setting('selected_sound'),
+                         scripts=get_available_scripts(),
+                         is_first_time=not get_setting('twitch_username'),
                          total_spins=total_spins,
-                         twitch_username=twitch_username,
-                         sub_count=sub_count,
-                         selected_sound=selected_sound,
-                         is_first_time=is_first_time)
+                         most_common_result=most_common_result)
 
 @app.route('/save_initial_settings', methods=['POST'])
 def save_initial_settings():
@@ -782,18 +811,30 @@ def trigger_spin():
 
 @app.route('/spin_history', methods=['GET'])
 def get_spin_history():
-    spin_history = SpinHistory.query.order_by(SpinHistory.timestamp.desc()).limit(10).all()
-    history_data = [
-        {
-            "result": entry.result,
-            "timestamp": f"{entry.timestamp.strftime('%m').lstrip('0')}/"
-                         f"{entry.timestamp.strftime('%d').lstrip('0')}/"
-                         f"{entry.timestamp.strftime('%y')} - "
-                         f"{entry.timestamp.strftime('%I').lstrip('0')}:{entry.timestamp.strftime('%M%p')}"
-        }
-        for entry in spin_history
-    ]
-    return jsonify(history_data)
+    """Get the spin history."""
+    try:
+        history = SpinHistory.query.order_by(SpinHistory.timestamp.desc()).limit(10).all()
+        formatted_history = []
+        for h in history:
+            try:
+                # Try Windows-style formatting first
+                timestamp = h.timestamp.strftime("%#m/%#d/%y - %#I:%M%p")
+            except ValueError:
+                try:
+                    # Try Unix-style formatting if Windows fails
+                    timestamp = h.timestamp.strftime("%-m/%-d/%y - %-I:%M%p")
+                except ValueError:
+                    # Fallback to basic formatting if both fail
+                    timestamp = h.timestamp.strftime("%m/%d/%y - %I:%M%p")
+            
+            formatted_history.append({
+                'result': h.result,
+                'timestamp': timestamp
+            })
+        return jsonify(formatted_history)
+    except Exception as e:
+        print(f"Error in get_spin_history: {str(e)}")  # Add debug logging
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/save_spin_result', methods=['POST'])
 def save_spin_result():
@@ -823,6 +864,7 @@ def run_script(script_name):
     
 # Ensure databases are initialized
 with app.app_context():
+    db.drop_all()
     db.create_all()
     get_twitch_username()
 

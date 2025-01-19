@@ -89,7 +89,7 @@ const canvas = document.getElementById('wheel');
                     const listItem = document.createElement('li');
                     listItem.innerHTML = `
                         <span>${entry.result}</span>
-                        <span style="float: right;">${entry.timestamp}</span>
+                        <span>${entry.timestamp}</span>
                     `;
                     spinHistoryList.appendChild(listItem);
                 });
@@ -100,6 +100,11 @@ const canvas = document.getElementById('wheel');
         
         // Call this function on page load to populate spin history
         document.addEventListener("DOMContentLoaded", populateSpinHistory);
+    
+        // Also update spin history when a new spin is completed
+        socket.on("spin_completed", (data) => {
+            populateSpinHistory();  // Refresh the history list
+        });
     
         async function populateWheel() {
             const response = await fetch('/spin');
@@ -346,10 +351,10 @@ const canvas = document.getElementById('wheel');
                     result: entryName,
                     timestamp: new Date().toISOString(),
                 });
-        
+
                 // Execute OBS action immediately after modal closes
                 executeObsAction(obsAction, obsActionParam);
-        
+
                 // Execute custom script if present
                 if (scriptName) {
                     fetch(`/execute_script/${scriptName}`, { method: "POST" })

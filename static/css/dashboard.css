@@ -4,6 +4,15 @@ body {
     padding: 20px;
     background-color: #1a1a1a;
     color: #fff;
+    display: flex;
+    justify-content: center;
+}
+
+/* Add a wrapper for all content */
+.dashboard-wrapper {
+    width: 100%;
+    max-width: 1000px;
+    margin: 0 auto;
 }
 
 header {
@@ -12,6 +21,8 @@ header {
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
     margin-bottom: 20px;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 h1 {
@@ -21,15 +32,15 @@ h1 {
 
 .status-bar {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 20px;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
     margin-top: 15px;
 }
 
 .status-item {
     display: flex;
     flex-direction: column;
-    padding: 10px;
+    padding: 8px;
     background-color: #363636;
     border-radius: 6px;
     border: 1px solid #404040;
@@ -54,11 +65,13 @@ main {
     display: grid;
     gap: 20px;
     grid-template-columns: 1fr;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 #key-and-result-container {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    grid-template-columns: 2fr 1fr;
     gap: 20px;
 }
 
@@ -67,6 +80,8 @@ section {
     padding: 20px;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    width: 100%;
+    box-sizing: border-box;
 }
 
 section h2 {
@@ -661,12 +676,12 @@ input[type="number"]::-webkit-inner-spin-button {
 /* General styles for list items */
 #key-section li {
     display: grid;
-    grid-template-columns: 2fr 1fr 1fr 1fr; /* Define columns */
+    grid-template-columns: 2fr 1fr 1fr 1fr;
     gap: 10px;
     padding: 10px;
     border-bottom: 1px solid #404040;
-    align-items: center; /* Vertically center items */
-    justify-items: center; /* Horizontally center items */
+    align-items: center;
+    justify-items: center;
 }
 
 #key-section ul {
@@ -677,7 +692,7 @@ input[type="number"]::-webkit-inner-spin-button {
 
 /* View mode styling */
 .view-mode {
-    display: contents; /* Maintain parent grid layout */
+    display: contents;
 }
 
 .view-field {
@@ -693,7 +708,7 @@ input[type="number"]::-webkit-inner-spin-button {
 
 /* Edit mode styling */
 .edit-mode {
-    display: contents; /* Maintain parent grid layout */
+    display: contents;
 }
 
 .edit-field {
@@ -704,13 +719,13 @@ input[type="number"]::-webkit-inner-spin-button {
 /* Edit mode input fields */
 .edit-field input,
 .edit-field select {
-    width: 100%; /* Take full width of the grid column */
+    width: 100%;
     padding: 8px;
     border: 1px solid #404040;
     border-radius: 4px;
     background-color: #363636;
     color: #fff;
-    text-align: center; /* Center text */
+    text-align: center;
     box-sizing: border-box;
 }
 
@@ -729,7 +744,7 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 
 .view-field:nth-child(1) {
-    text-align: left; /* Left-align the title for clarity */
+    text-align: left;
 }
 
 /* Ensure each field takes up its full grid cell width */

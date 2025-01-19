@@ -10,161 +10,163 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
-    <header>
-        <div class="header-content">
-            <h1>Wheel Dashboard</h1>
-            <div class="header-actions">
-                <a href="/settings" class="icon-btn" title="Settings">
-                    <i class="fas fa-gear"></i>
-                </a>
-                <a href="/wheel" target="_blank" class="icon-btn" title="Open Wheel">
-                    <i class="fas fa-up-right-from-square"></i>
-                </a>
+    <div class="dashboard-wrapper">
+        <header>
+            <div class="header-content">
+                <h1>Wheel Dashboard</h1>
+                <div class="header-actions">
+                    <a href="/settings" class="icon-btn" title="Settings">
+                        <i class="fas fa-gear"></i>
+                    </a>
+                    <a href="/wheel" target="_blank" class="icon-btn" title="Open Wheel">
+                        <i class="fas fa-up-right-from-square"></i>
+                    </a>
+                </div>
             </div>
-        </div>
-        <div class="status-bar">
-            <div class="status-item">
-                <span class="label">Twitch Channel</span>
-                <span class="value">{{ twitch_username }}</span>
+            <div class="status-bar">
+                <div class="status-item">
+                    <span class="label">Twitch Channel</span>
+                    <span class="value">{{ twitch_username }}</span>
+                </div>
+                <div class="status-item">
+                    <span class="label">Required Subs</span>
+                    <span class="value">{{ sub_count }}</span>
+                </div>
+                <div class="status-item">
+                    <span class="label">Wheel Sound</span>
+                    <span class="value">{{ selected_sound if selected_sound else "None" }}</span>
+                </div>
+                <div class="status-item">
+                    <span class="label">Total Entries</span>
+                    <span class="value">{{ entries|length }}</span>
+                </div>
             </div>
-            <div class="status-item">
-                <span class="label">Required Subs</span>
-                <span class="value">{{ sub_count }}</span>
+        </header>
+        <main>
+            <div id="key-and-result-container">
+                <section id="key-section">
+                    <div class="section-header">
+                        <h2>Entries</h2>
+                        <div class="header-buttons">
+                            <button class="icon-btn edit-mode-btn" onclick="toggleEditMode()" title="Toggle Edit Mode" {% if not entries %}disabled{% endif %}>
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <a href="#" onclick="openModal(); return false;" class="manage-entries-btn" title="Add Entry">
+                                <i class="fas fa-plus"></i>
+                            </a>
+                        </div>
+                    </div>
+                    <div class="entry-header">
+                        <span>Title</span>
+                        <span>Chance</span>
+                        <span>Script</span>
+                        <span>OBS</span>
+                    </div>
+                    <ul>
+                        {% for entry in entries %}
+                        <li data-entry-id="{{ entry.id }}">
+                            <!-- View Mode -->
+                            <div class="view-mode">
+                                <div class="view-field">{{ entry.name }}</div>
+                                <div class="view-field">{{ "%.1f" | format(entry.chance_percent) }}%</div>
+                                <div class="view-field">{{ entry.script_name if entry.script_name else "None" }}</div>
+                                <div class="view-field">{{ entry.obs_action if entry.obs_action else "None" }}</div>
+                            </div>
+                            <!-- Edit Mode -->
+                            <div class="edit-mode">
+                                <div class="edit-field">
+                                    <input type="text" class="edit-title" value="{{ entry.name }}" maxlength="30">
+                                </div>
+                                <div class="edit-field">
+                                    <input type="number" class="edit-weight" value="{{ entry.weight }}" step="any" min="0.1">
+                                </div>
+                                <div class="edit-field">
+                                    <select class="edit-script">
+                                        <option value="">None</option>
+                                        {% for script in scripts %}
+                                        <option value="{{ script }}" {% if script == entry.script_name %}selected{% endif %}>{{ script }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="edit-field">
+                                    <select class="edit-obs-action">
+                                        <option value="">None</option>
+                                        <option value="StartStream" {% if entry.obs_action == 'StartStream' %}selected{% endif %}>Start Stream</option>
+                                        <option value="StopStream" {% if entry.obs_action == 'StopStream' %}selected{% endif %}>Stop Stream</option>
+                                        <option value="HideSource" {% if entry.obs_action == 'HideSource' %}selected{% endif %}>Hide Source</option>
+                                        <option value="ShowSource" {% if entry.obs_action == 'ShowSource' %}selected{% endif %}>Show Source</option>
+                                        <option value="SwitchScene" {% if entry.obs_action == 'SwitchScene' %}selected{% endif %}>Switch Scene</option>
+                                    </select>
+                                    <input type="text" class="edit-obs-param" value="{{ entry.obs_action_param }}" placeholder="Scene/Source name">
+                                </div>
+                                <div class="edit-actions">
+                                    <button class="save-btn" data-entry-id="{{ entry.id }}" onclick="saveEntry(this.dataset.entryId)"><i class="fas fa-save"></i></button>
+                                    <button class="delete-btn" data-entry-id="{{ entry.id }}" onclick="deleteEntry(this.dataset.entryId)"><i class="fas fa-trash"></i></button>
+                                </div>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>                
+                </section>
+                <section id="result-section">
+                    <h2>Recent Results</h2>
+                    <ul>
+                        {% for spin in spin_history %}
+                        <li>
+                            <span>{{ spin.result }}</span>
+                            <span>{{ spin.timestamp }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </section>
             </div>
-            <div class="status-item">
-                <span class="label">Wheel Sound</span>
-                <span class="value">{{ selected_sound if selected_sound else "None" }}</span>
-            </div>
-            <div class="status-item">
-                <span class="label">Total Entries</span>
-                <span class="value">{{ entries|length }}</span>
-            </div>
-        </div>
-    </header>
-    <main>
-        <div id="key-and-result-container">
-            <section id="key-section">
-                <div class="section-header">
-                    <h2>Entries</h2>
-                    <div class="header-buttons">
-                        <button class="icon-btn edit-mode-btn" onclick="toggleEditMode()" title="Toggle Edit Mode" {% if not entries %}disabled{% endif %}>
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <a href="#" onclick="openModal(); return false;" class="manage-entries-btn" title="Add Entry">
-                            <i class="fas fa-plus"></i>
-                        </a>
+            <div id="stats-section">
+                <h2>Statistics</h2>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <span class="stat-label">Most Common Result</span>
+                        <span class="stat-value">{{ most_common_result }}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Available Scripts</span>
+                        <span class="stat-value">{{ scripts|length }}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Total Spins</span>
+                        <span class="stat-value">{{ total_spins }}</span>
                     </div>
                 </div>
-                <div class="entry-header">
-                    <span>Title</span>
-                    <span>Chance (Weight)</span>
-                    <span>Script</span>
-                    <span>OBS</span>
-                </div>
-                <ul>
-                    {% for entry in entries %}
-                    <li data-entry-id="{{ entry.id }}">
-                        <!-- View Mode -->
-                        <div class="view-mode">
-                            <div class="view-field">{{ entry.name }}</div>
-                            <div class="view-field">{{ "%.2f" | format(entry.chance) }}% ({{ entry.weight }})</div>
-                            <div class="view-field">{{ entry.script_name if entry.script_name else "—" }}</div>
-                            <div class="view-field">{{ entry.obs_action_param if entry.obs_action_param else "—" }}</div>
-                        </div>
-                        <!-- Edit Mode -->
-                        <div class="edit-mode">
-                            <div class="edit-field">
-                                <input type="text" class="edit-title" value="{{ entry.name }}" maxlength="30">
-                            </div>
-                            <div class="edit-field">
-                                <input type="number" class="edit-weight" value="{{ entry.weight }}" step="any" min="0.1">
-                            </div>
-                            <div class="edit-field">
-                                <select class="edit-script">
-                                    <option value="">None</option>
-                                    {% for script in scripts %}
-                                    <option value="{{ script }}" {% if script == entry.script_name %}selected{% endif %}>{{ script }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="edit-field">
-                                <select class="edit-obs-action">
-                                    <option value="">None</option>
-                                    <option value="StartStream" {% if entry.obs_action == 'StartStream' %}selected{% endif %}>Start Stream</option>
-                                    <option value="StopStream" {% if entry.obs_action == 'StopStream' %}selected{% endif %}>Stop Stream</option>
-                                    <option value="HideSource" {% if entry.obs_action == 'HideSource' %}selected{% endif %}>Hide Source</option>
-                                    <option value="ShowSource" {% if entry.obs_action == 'ShowSource' %}selected{% endif %}>Show Source</option>
-                                    <option value="SwitchScene" {% if entry.obs_action == 'SwitchScene' %}selected{% endif %}>Switch Scene</option>
-                                </select>
-                                <input type="text" class="edit-obs-param" value="{{ entry.obs_action_param }}" placeholder="Scene/Source name">
-                            </div>
-                            <div class="edit-actions">
-                                <button class="save-btn" data-entry-id="{{ entry.id }}" onclick="saveEntry(this.dataset.entryId)"><i class="fas fa-save"></i></button>
-                                <button class="delete-btn" data-entry-id="{{ entry.id }}" onclick="deleteEntry(this.dataset.entryId)"><i class="fas fa-trash"></i></button>
-                            </div>
-                        </div>
-                    </li>
-                    {% endfor %}
-                </ul>                
-            </section>
-            <section id="result-section">
-                <h2>Recent Results</h2>
-                <ul>
-                    {% for spin in spin_history %}
-                    <li>
-                        <span>{{ spin.result }}</span>
-                        <span>{{ spin.timestamp }}</span>
-                    </li>
-                    {% endfor %}
-                </ul>
-            </section>
-        </div>
-        <div id="stats-section">
-            <h2>Statistics</h2>
-            <div class="stats-grid">
-                <div class="stat-item">
-                    <span class="stat-label">Most Common Result</span>
-                    <span class="stat-value">{{ most_common_result }}</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">Available Scripts</span>
-                    <span class="stat-value">{{ scripts|length }}</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">Total Spins</span>
-                    <span class="stat-value">{{ total_spins }}</span>
-                </div>
             </div>
-        </div>
-        <div id="trigger-section">
-            <button id="trigger-spin-btn" {% if not entries %}disabled{% endif %}>
-                {% if not entries %}No Entries Available{% else %}Trigger Spin{% endif %}
-            </button>
-        </div>
-        <div id="initial-settings-modal" class="modal {% if is_first_time %}show{% endif %}">
-            <div class="modal-content">
-                <h2>Initial Setup</h2>
-                <form id="initial-settings-form">
-                    <label for="twitch_username">Twitch Username</label>
-                    <input type="text" id="twitch_username" name="twitch_username" required>
-                    
-                    <label for="sub_count">Required Subscribers to Spin Wheel</label>
-                    <input type="number" id="sub_count" name="sub_count" min="1" value="3" required>
-                    
-                    <label for="obs_host">OBS Host</label>
-                    <input type="text" id="obs_host" name="obs_host" value="localhost" required>
-                    
-                    <label for="obs_port">OBS Port</label>
-                    <input type="number" id="obs_port" name="obs_port" value="4455" required>
-                    
-                    <label for="obs_password">OBS Password</label>
-                    <input type="text" id="obs_password" name="obs_password">
-                    
-                    <button type="submit">Save Settings</button>
-                </form>
+            <div id="trigger-section">
+                <button id="trigger-spin-btn" {% if not entries %}disabled{% endif %}>
+                    {% if not entries %}No Entries Available{% else %}Trigger Spin{% endif %}
+                </button>
             </div>
-        </div>        
-    </main>
+            <div id="initial-settings-modal" class="modal {% if is_first_time %}show{% endif %}">
+                <div class="modal-content">
+                    <h2>Initial Setup</h2>
+                    <form id="initial-settings-form">
+                        <label for="twitch_username">Twitch Username</label>
+                        <input type="text" id="twitch_username" name="twitch_username" required>
+                        
+                        <label for="sub_count">Required Subscribers to Spin Wheel</label>
+                        <input type="number" id="sub_count" name="sub_count" min="1" value="3" required>
+                        
+                        <label for="obs_host">OBS Host</label>
+                        <input type="text" id="obs_host" name="obs_host" value="localhost" required>
+                        
+                        <label for="obs_port">OBS Port</label>
+                        <input type="number" id="obs_port" name="obs_port" value="4455" required>
+                        
+                        <label for="obs_password">OBS Password</label>
+                        <input type="text" id="obs_password" name="obs_password">
+                        
+                        <button type="submit">Save Settings</button>
+                    </form>
+                </div>
+            </div>        
+        </main>
+    </div>
     <div id="toast-container"></div>
     <div class="modal" id="add-entry-modal">
         <div class="modal-content">
