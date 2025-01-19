@@ -178,68 +178,52 @@ def reconnect_to_twitch_chat():
     connect_to_twitch_chat()
 
 def perform_obs_action(action, params=None):
-    if params is None:
-        params = {}
-
+    """Perform an action in OBS Studio."""
     try:
-        # Fetch OBS settings from the database
-        setting = Settings.query.first()
-        obs_host = setting.obs_host if setting else "localhost"
-        obs_port = setting.obs_port if setting else 4455
-        obs_password = setting.obs_password if setting else ""
+        # Get OBS settings
+        settings = Settings.query.first()
+        if not settings:
+            print("No OBS settings found")
+            return
 
-        ws = obsws(obs_host, obs_port, obs_password)
-        ws.connect()
+        # Create OBS WebSocket client
+        ws = obsws(settings.obs_host, settings.obs_port, settings.obs_password)
+        
+        try:
+            # Test connection before attempting action
+            ws.connect()
+        except ConnectionRefusedError:
+            print(f"Could not connect to OBS at {settings.obs_host}:{settings.obs_port}")
+            return
+        except Exception as e:
+            print(f"OBS connection error: {str(e)}")
+            return
 
-        if action == "StartStream":
-            ws.call(requests.StartStream())
-            print("Successfully started the stream")
+        try:
+            if action == "StartStream":
+                ws.call(requests.StartStream())
+            elif action == "StopStream":
+                ws.call(requests.StopStream())
+            elif action == "SwitchScene" and params.get("scene_name"):
+                ws.call(requests.SetCurrentProgramScene(sceneName=params["scene_name"]))
+            elif action == "ShowSource" and params.get("obs_action_param"):
+                ws.call(requests.SetSceneItemEnabled(
+                    sceneName=params.get("scene_name", "Scene"),
+                    sceneItemId=params["obs_action_param"],
+                    sceneItemEnabled=True
+                ))
+            elif action == "HideSource" and params.get("obs_action_param"):
+                ws.call(requests.SetSceneItemEnabled(
+                    sceneName=params.get("scene_name", "Scene"),
+                    sceneItemId=params["obs_action_param"],
+                    sceneItemEnabled=False
+                ))
+        finally:
+            ws.disconnect()
 
-        elif action == "StopStream":
-            ws.call(requests.StopStream())
-            print("Successfully stopped the stream")
-
-        elif action in ["ShowSource", "HideSource"]:
-            scene_name = params.get("scene_name")
-            source_name = params.get("obs_action_param")
-
-            if not scene_name or not source_name:
-                print("Scene name or source name is missing.")
-                ws.disconnect()
-                return
-
-            response = ws.call(requests.GetSceneItemList(sceneName=scene_name))
-            scene_items = response.getSceneItems()
-
-            scene_item = next((item for item in scene_items if item["sourceName"] == source_name), None)
-
-            if scene_item:
-                ws.call(
-                    requests.SetSceneItemEnabled(
-                        sceneName=scene_name,
-                        sceneItemId=scene_item["sceneItemId"],
-                        sceneItemEnabled=(action == "ShowSource")
-                    )
-                )
-                print(f"{'Enabled' if action == 'ShowSource' else 'Disabled'} source: {source_name}")
-            else:
-                print(f"Source '{source_name}' not found in scene '{scene_name}'")
-
-        elif action == "SwitchScene":
-            scene_name = params.get("scene_name")
-            ws.call(requests.SetCurrentProgramScene(sceneName=scene_name))
-            print(f"Successfully switched to scene: {scene_name}")
-
-        else:
-            print(f"Unknown OBS action: {action}")
-
-        ws.disconnect()
-
-    except obswebsocket.exceptions.ConnectionFailure as e:
-        print(f"Failed to connect to OBS WebSocket: {e}")
     except Exception as e:
-        print(f"Error performing OBS action: {e}")
-    
+        print(f"Error performing OBS action: {str(e)}")
+
 def get_twitch_username():
     """Get the Twitch username from settings."""
     setting = Settings.query.first()  # Get the first (and should be only) settings record
