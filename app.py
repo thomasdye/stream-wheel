@@ -13,12 +13,8 @@ import random
 from eventlet import wsgi
 from obswebsocket import obsws, requests
 import obswebsocket
-from dotenv import load_dotenv
 from sqlalchemy import func
 import socket
-
-# Load environment variables from .env file
-load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = "thissecretkeyisonlyrequiredforflashingmessages"
