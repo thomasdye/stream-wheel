@@ -809,7 +809,6 @@ def run_script(script_name):
 # Ensure databases are initialized
 with app.app_context():
     ensure_directories_exist()
-    db.drop_all()
     db.create_all()
     get_twitch_username()
 
