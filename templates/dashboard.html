@@ -216,6 +216,14 @@
                 <label for="green_screen_color">Green Screen Color</label>
                 <input type="color" id="green_screen_color" name="green_screen_color" value="{{ green_screen_color }}">
                 
+                <div class="toggle-container">
+                    <label for="green_screen_enabled">Enable Green Screen</label>
+                    <label class="switch">
+                        <input type="checkbox" id="green_screen_enabled" name="green_screen_enabled" {% if green_screen_enabled %}checked{% endif %}>
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+                
                 <label for="sub_count">Required Subscribers</label>
                 <input type="number" id="sub_count" name="sub_count" value="{{ sub_count }}" min="1" required>
                 

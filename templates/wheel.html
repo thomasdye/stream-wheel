@@ -42,7 +42,10 @@
 
     <audio id="spin-sound" src="/custom_sounds/{{ selected_sound }}" preload="auto"></audio>
 
-    <div id="inactivity-overlay" data-color="{{ green_screen_color | default('#00FF00') }}"></div>
+    <div id="inactivity-overlay" 
+         data-color="{{ green_screen_color | default('#00FF00') }}"
+         data-enabled="{{ 'true' if green_screen_enabled else 'false' }}">
+    </div>
 
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <script src="static/js/wheel.js"></script>

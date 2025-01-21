@@ -450,16 +450,23 @@ document.addEventListener("DOMContentLoaded", () => {
             e.preventDefault();
             const formData = new FormData(settingsForm);
             
+            // Get checkbox state directly from the element
+            const greenScreenEnabled = document.getElementById('green_screen_enabled').checked;
+            console.log('Green Screen Enabled:', greenScreenEnabled);  // Debug log
+            
             // Convert FormData to JSON object
             const jsonData = {
                 twitch_username: formData.get('twitch_username'),
                 green_screen_color: formData.get('green_screen_color'),
+                green_screen_enabled: greenScreenEnabled,
                 sub_count: formData.get('sub_count'),
                 sound: formData.get('sound'),
                 obs_host: formData.get('obs_host'),
                 obs_port: formData.get('obs_port'),
                 obs_password: formData.get('obs_password')
             };
+
+            console.log('Sending settings data:', jsonData);  // Debug log
 
             try {
                 const response = await fetch('/settings', {
@@ -471,9 +478,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
                 
                 const data = await response.json();
+                console.log('Response from server:', data);  // Debug log
                 
                 if (data.success) {
-                    // Store toast message before reload
                     localStorage.setItem('pendingToast', JSON.stringify({
                         message: 'Settings saved successfully!',
                         type: 'success'

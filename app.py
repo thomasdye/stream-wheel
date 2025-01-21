@@ -44,6 +44,7 @@ class Settings(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     twitch_username = db.Column(db.String(100), nullable=False)
     green_screen_color = db.Column(db.String(7), default="#00FF00")
+    green_screen_enabled = db.Column(db.Boolean, default=False)
     sub_count = db.Column(db.Integer, default=3)
     sound = db.Column(db.String(100), nullable=True)
     obs_host = db.Column(db.String(100), default="localhost", nullable=False)
@@ -393,32 +394,39 @@ def dashboard():
     entries = Entry.query.all()
     settings = Settings.query.first()
     
-    # Calculate percentages for entries
+    # Calculate total weight
     total_weight = sum(entry.weight for entry in entries)
+    
+    # Calculate chance percentage for each entry
     for entry in entries:
         entry.chance_percent = (entry.weight / total_weight * 100) if total_weight > 0 else 0
     
-    # Get sounds for the dropdown
+    # Get settings values, using defaults if no settings exist
+    twitch_username = settings.twitch_username if settings else None
+    sub_count = settings.sub_count if settings else 3
+    selected_sound = settings.sound if settings else None
+    green_screen_color = settings.green_screen_color if settings else "#00FF00"
+    green_screen_enabled = settings.green_screen_enabled if settings else False
+    obs_host = settings.obs_host if settings else "localhost"
+    obs_port = settings.obs_port if settings else 4455
+    obs_password = settings.obs_password if settings else ""
+
+    # Get list of available sound files
     sounds = get_available_sounds()
     
-    # Calculate total spins and most common result
-    total_spins = SpinHistory.query.count()
-    most_common_result = get_most_common_result()
-    
-    return render_template('dashboard.html',
-                         entries=entries,
-                         twitch_username=settings.twitch_username if settings else "",
-                         sub_count=settings.sub_count if settings else 3,
-                         selected_sound=settings.sound if settings else None,
-                         sounds=sounds,
-                         scripts=get_available_scripts(),
-                         green_screen_color=settings.green_screen_color if settings else "#00FF00",
-                         obs_host=settings.obs_host if settings else "localhost",
-                         obs_port=settings.obs_port if settings else 4455,
-                         obs_password=settings.obs_password if settings else "",
-                         is_first_time=not settings or not settings.twitch_username,
-                         total_spins=total_spins,
-                         most_common_result=most_common_result)
+    return render_template(
+        'dashboard.html',
+        entries=entries,
+        twitch_username=twitch_username,
+        sub_count=sub_count,
+        selected_sound=selected_sound,
+        sounds=sounds,
+        green_screen_color=green_screen_color,
+        green_screen_enabled=green_screen_enabled,
+        obs_host=obs_host,
+        obs_port=obs_port,
+        obs_password=obs_password
+    )
 
 @app.route('/save_initial_settings', methods=['POST'])
 def save_initial_settings():
@@ -454,11 +462,16 @@ def wheel():
     """Render the wheel page."""
     # Fetch settings
     setting = Settings.query.first()
-    green_screen_color = setting.green_screen_color if setting else "#00FF00"
-    selected_sound = setting.sound if setting and setting.sound else None
-    
-    # Get the twitch username from settings
-    display_username = setting.twitch_username if setting and setting.twitch_username else "Streamer"
+    if setting:
+        green_screen_color = setting.green_screen_color
+        green_screen_enabled = setting.green_screen_enabled
+        selected_sound = setting.sound
+        display_username = setting.twitch_username
+    else:
+        green_screen_color = "#00FF00"
+        green_screen_enabled = False
+        selected_sound = None
+        display_username = "Streamer"
 
     # Fetch entries
     entries = Entry.query.all()
@@ -468,6 +481,7 @@ def wheel():
         entries=entries,
         twitch_username=display_username,
         green_screen_color=green_screen_color,
+        green_screen_enabled=green_screen_enabled,
         selected_sound=selected_sound
     )
 
@@ -894,6 +908,7 @@ def handle_settings_change():
 def save_settings():
     try:
         data = request.get_json()
+        print(f"Received settings data: {data}")  # Debug log
         
         # Get existing settings or create new
         settings = Settings.query.first()
@@ -904,11 +919,14 @@ def save_settings():
         # Update settings with form data
         settings.twitch_username = data.get('twitch_username')
         settings.green_screen_color = data.get('green_screen_color')
+        settings.green_screen_enabled = data.get('green_screen_enabled', False)
         settings.sub_count = int(data.get('sub_count', 3))
         settings.sound = data.get('sound')
         settings.obs_host = data.get('obs_host', 'localhost')
         settings.obs_port = int(data.get('obs_port', 4455))
         settings.obs_password = data.get('obs_password', '')
+        
+        print(f"Saving settings - Green Screen Enabled: {settings.green_screen_enabled}")  # Debug log
         
         db.session.commit()
         
@@ -917,6 +935,7 @@ def save_settings():
         
         return jsonify({'success': True})
     except Exception as e:
+        print(f"Error saving settings: {e}")  # Debug log
         return jsonify({'success': False, 'error': str(e)})
 
 if __name__ == '__main__':
