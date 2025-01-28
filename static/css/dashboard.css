@@ -2,8 +2,8 @@ body {
     font-family: Arial, sans-serif;
     margin: 0;
     padding: 20px;
-    background-color: #1a1a1a;
-    color: #fff;
+    background-color: #121212;
+    color: #ffffff;
     display: flex;
     justify-content: center;
 }
@@ -13,6 +13,7 @@ body {
     width: 100%;
     max-width: 1000px;
     margin: 0 auto;
+    background-color: #1e1e1e;
 }
 
 header {
@@ -929,4 +930,129 @@ input:checked + .slider:before {
 
 .slider.round:before {
     border-radius: 50%;
+}
+
+/* Entry controls */
+.entry-controls {
+    margin: 10px 0;
+}
+
+.controls-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr; /* Match the header layout, skipping "Chance" */
+    gap: 20px;
+    align-items: center;
+    justify-items: center; /* Center items horizontally */
+}
+
+.search-container {
+    grid-column: 1; /* Place the search box in the first column (Title) */
+    display: flex;
+    justify-content: center;
+    width: 100%;
+}
+
+.search-box {
+    position: relative;
+    width: 150px; /* Adjust the width of the search box */
+}
+
+.search-box input {
+    width: 100%;
+    padding: 8px 30px 8px 10px;
+    border: 1px solid #444;
+    border-radius: 4px;
+    background-color: #2a2a2a;
+    color: #ffffff;
+}
+
+.search-box i {
+    position: absolute;
+    right: 0px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #999;
+    pointer-events: none;
+}
+
+.filter-options {
+    grid-column: 3 / span 2; /* Place the dropdowns in the third and fourth columns (Script and OBS) */
+    display: flex;
+    gap: 10px;
+    width: 100%;
+    justify-content: center; /* Center dropdowns horizontally */
+}
+
+.filter-options select {
+    width: 100%; /* Ensure dropdowns take up available space */
+    max-width: 200px; /* Limit dropdown width */
+    padding: 8px;
+    border: 1px solid #444;
+    border-radius: 4px;
+    background-color: #2a2a2a;
+    color: #ffffff;
+}
+
+/* Chart tabs styling */
+.chart-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.chart-tab {
+    padding: 10px 20px;
+    background-color: #363636;
+    border: 1px solid #404040;
+    border-radius: 4px;
+    color: #fff;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.chart-tab.active {
+    background-color: #007bff;
+    border-color: #007bff;
+}
+
+.chart-tab:hover {
+    background-color: #404040;
+}
+
+.chart-tab.active:hover {
+    background-color: #0056b3;
+}
+
+/* Quick actions styling */
+#quick-actions {
+    margin-top: 20px;
+}
+
+.action-buttons {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+}
+
+.action-buttons button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 12px 20px;
+    background-color: #363636;
+    border: 1px solid #404040;
+    border-radius: 4px;
+    color: #fff;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.action-buttons button:hover {
+    background-color: #404040;
+    transform: translateY(-2px);
+}
+
+.action-buttons button i {
+    font-size: 1.1em;
 }

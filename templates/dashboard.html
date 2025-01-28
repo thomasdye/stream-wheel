@@ -6,6 +6,7 @@
     <title>Dashboard</title>
     <link rel="stylesheet" href="static/css/dashboard.css">
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="static/js/dashboard.js" defer></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
@@ -62,6 +63,32 @@
                         <span>Script</span>
                         <span>OBS</span>
                     </div>
+                    <div class="entry-controls">
+                        <div class="controls-row">
+                            <div class="search-container">
+                                <div class="search-box">
+                                    <input type="text" id="entry-search" placeholder="Search entries...">
+                                    <i class="fas fa-search"></i>
+                                </div>
+                            </div>
+                            <div class="filter-options">
+                                <select id="script-filter">
+                                    <option value="">All Scripts</option>
+                                    <option value="none">None</option>
+                                    <!-- Options will be populated here by JavaScript -->
+                                </select>
+                                <select id="obs-filter">
+                                    <option value="">All OBS Actions</option>
+                                    <option value="none">No Action</option>
+                                    <option value="StartStream">Start Stream</option>
+                                    <option value="StopStream">Stop Stream</option>
+                                    <option value="ShowSource">Show Source</option>
+                                    <option value="HideSource">Hide Source</option>
+                                    <option value="SwitchScene">Switch Scene</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
                     <ul>
                         {% for entry in entries %}
                         <li data-entry-id="{{ entry.id }}">
@@ -83,9 +110,7 @@
                                 <div class="edit-field">
                                     <select class="edit-script">
                                         <option value="">None</option>
-                                        {% for script in scripts %}
-                                        <option value="{{ script }}" {% if script == entry.script_name %}selected{% endif %}>{{ script }}</option>
-                                        {% endfor %}
+                                        <!-- Options will be populated here by JavaScript -->
                                     </select>
                                 </div>
                                 <div class="edit-field">
@@ -128,12 +153,24 @@
                         <span class="stat-value">{{ most_common_result }}</span>
                     </div>
                     <div class="stat-item">
-                        <span class="stat-label">Available Scripts</span>
-                        <span class="stat-value">{{ scripts|length }}</span>
+                        <span class="stat-label">Last Spin</span>
+                        <span class="stat-value">{{ last_spin_result if last_spin_result else "No spins yet" }}</span>
                     </div>
                     <div class="stat-item">
-                        <span class="stat-label">Total Spins</span>
-                        <span class="stat-value">{{ total_spins }}</span>
+                        <span class="stat-label">Spins Today</span>
+                        <span class="stat-value">{{ spins_today }}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Total Weight</span>
+                        <span class="stat-value">{{ total_weight }}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Least Common Result</span>
+                        <span class="stat-value">{{ least_common_result }}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Average Spins/Day</span>
+                        <span class="stat-value">{{ avg_spins_per_day|round(1) }}</span>
                     </div>
                 </div>
             </div>
@@ -165,6 +202,42 @@
                     </form>
                 </div>
             </div>        
+            <section id="visualization-section">
+                <h2>Spin Analytics</h2>
+                <div class="chart-container">
+                    <!-- Add tabs for different charts -->
+                    <div class="chart-tabs">
+                        <button class="chart-tab active" data-chart="distribution">Result Distribution</button>
+                        <button class="chart-tab" data-chart="timeline">Daily Timeline</button>
+                        <button class="chart-tab" data-chart="heatmap">Time Heatmap</button>
+                    </div>
+                    <!-- Chart canvas -->
+                    <canvas id="statsChart"></canvas>
+                </div>
+            </section>
+            <section id="quick-actions">
+                <div class="section-header">
+                    <h2>Quick Actions</h2>
+                </div>
+                <div class="action-buttons">
+                    <button onclick="window.resetSpinHistory()">
+                        <i class="fas fa-trash"></i>
+                        Reset Spin History
+                    </button>
+                    <button onclick="window.exportData()">
+                        <i class="fas fa-file-export"></i>
+                        Export Wheel
+                    </button>
+                    <button onclick="window.importData()">
+                        <i class="fas fa-file-import"></i>
+                        Import Wheel
+                    </button>
+                    <button onclick="window.backupSettings()">
+                        <i class="fas fa-download"></i>
+                        Backup Settings
+                    </button>
+                </div>
+            </section>
         </main>
     </div>
     <div id="toast-container"></div>
@@ -193,9 +266,7 @@
                 <label for="script">Custom Script</label>
                 <select name="script" id="script-select">
                     <option value="" selected>None</option>
-                    {% for script in scripts %}
-                    <option value="{{ script }}">{{ script }}</option>
-                    {% endfor %}
+                    <!-- Options will be populated here by JavaScript -->
                 </select>
 
                 <textarea name="description" placeholder="Add a description..." maxlength="100"></textarea>

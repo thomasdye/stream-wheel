@@ -88,18 +88,79 @@ function updateSoundDropdown(sounds) {
 }
 
 function updateScriptDropdown(scripts) {
-    const dropdown = document.getElementById('script-select');
-    const currentValue = dropdown.value;
-    dropdown.innerHTML = '<option value="">None</option>';
+    const mainDropdown = document.getElementById('script-filter');
+    const addEntryDropdown = document.getElementById('script-select');
+    const currentValueMain = mainDropdown.value;
+    const currentValueAddEntry = addEntryDropdown.value;
+
+    // Update main dropdown
+    mainDropdown.innerHTML = '<option value="">All Scripts</option>'; // Default option
+    mainDropdown.innerHTML += '<option value="none">None</option>'; // Add "None" option
+
     scripts.forEach(script => {
         const option = document.createElement('option');
         option.value = script;
         option.textContent = script;
-        dropdown.appendChild(option);
+        mainDropdown.appendChild(option);
     });
-    if (scripts.includes(currentValue)) {
-        dropdown.value = currentValue;
+
+    // Update add entry dropdown
+    addEntryDropdown.innerHTML = '<option value="" selected>None</option>'; // Reset options
+    scripts.forEach(script => {
+        const option = document.createElement('option');
+        option.value = script;
+        option.textContent = script;
+        addEntryDropdown.appendChild(option);
+    });
+
+    // Set the dropdown values to the current values if they exist
+    if (currentValueMain && (scripts.includes(currentValueMain) || currentValueMain === "none")) {
+        mainDropdown.value = currentValueMain;
     }
+    if (currentValueAddEntry && (scripts.includes(currentValueAddEntry) || currentValueAddEntry === "none")) {
+        addEntryDropdown.value = currentValueAddEntry;
+    }
+}
+
+
+// Function to fetch and update scripts
+function fetchAndUpdateScripts() {
+    fetch('/list_scripts')
+        .then(response => response.json())
+        .then(data => {
+            if (data.scripts) {
+                updateScriptDropdown(data.scripts);
+                updateEditDropdowns(data.scripts);
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching scripts:', error);
+        });
+}
+
+// Function to update the script dropdowns in edit mode
+function updateEditDropdowns(scripts) {
+    const editEntries = document.querySelectorAll('.edit-mode'); // Select all edit mode sections
+
+    editEntries.forEach(entry => {
+        const dropdown = entry.querySelector('.edit-script'); // Get the specific dropdown for this entry
+        const currentScript = entry.querySelector('.view-field:nth-child(3)').textContent; // Get the current script from the view mode
+
+        console.log('Current Script:', currentScript); // Debugging line
+
+        dropdown.innerHTML = '<option value="">None</option>'; // Reset options
+        scripts.forEach(script => {
+            const option = document.createElement('option');
+            option.value = script;
+            option.textContent = script;
+            dropdown.appendChild(option);
+        });
+
+        // Set the dropdown value to the current script if it exists
+        if (currentScript) {
+            dropdown.value = currentScript === "None" ? "" : currentScript; // Set to "" if "None" is selected
+        }
+    });
 }
 
 // Main DOMContentLoaded event listener
@@ -143,27 +204,24 @@ document.addEventListener("DOMContentLoaded", () => {
     // Function to update the spin history list dynamically
     function updateSpinHistory() {
         fetch('/spin_history')
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Failed to fetch spin history');
-                }
-                return response.json();
-            })
+            .then(response => response.json())
             .then(history => {
-                const spinHistorySection = document.querySelector("#result-section ul");
-                spinHistorySection.innerHTML = ""; // Clear the current history
+                const historyList = document.querySelector('#result-section ul');
+                historyList.innerHTML = history.map(item => `
+                    <li>
+                        <span>${item.result}</span>
+                        <span>${item.timestamp}</span>
+                    </li>
+                `).join('');
 
-                history.forEach(spin => {
-                    const li = document.createElement("li");
-                    li.innerHTML = `
-                        <span>${spin.result}</span>
-                        <span>${spin.timestamp}</span>
-                    `;
-                    spinHistorySection.appendChild(li);
-                });
+                // Update the active chart
+                const activeChartTab = document.querySelector('.chart-tab.active');
+                if (activeChartTab) {
+                    updateChart(activeChartTab.dataset.chart);
+                }
             })
             .catch(error => {
-                console.error('Error updating spin history:', error);
+                console.error('Error fetching spin history:', error);
             });
     }
 
@@ -186,6 +244,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Modal functions
     function openModal() {
         addEntryModal.classList.add('show');
+        fetchAndUpdateScripts(); // Fetch scripts when the modal is opened
     }
 
     function closeModal() {
@@ -617,6 +676,300 @@ document.addEventListener("DOMContentLoaded", () => {
         showToast(toastData.message, toastData.type);
         localStorage.removeItem('pendingToast');
     }
+
+    // Search and filter functionality
+    const entrySearch = document.getElementById('entry-search');
+    const scriptFilter = document.getElementById('script-filter');
+    const obsFilter = document.getElementById('obs-filter');
+    const entryList = document.querySelector('#key-section ul');
+
+    function filterEntries() {
+        const searchTerm = entrySearch.value.toLowerCase();
+        const scriptValue = scriptFilter.value;
+        const obsValue = obsFilter.value;
+        
+        const entries = entryList.querySelectorAll('li');
+        
+        entries.forEach(entry => {
+            const title = entry.querySelector('.view-field:nth-child(1)').textContent.toLowerCase();
+            const script = entry.querySelector('.view-field:nth-child(3)').textContent;
+            const obsAction = entry.querySelector('.view-field:nth-child(4)').textContent;
+            
+            const matchesSearch = title.includes(searchTerm);
+            const matchesScript = (scriptValue === "none" && script === "None") || (!scriptValue || script === scriptValue);
+            const matchesObs = !obsValue || obsAction === obsValue;
+            
+            entry.style.display = matchesSearch && matchesScript && matchesObs ? '' : 'none';
+        });
+    }
+
+    entrySearch.addEventListener('input', filterEntries);
+    scriptFilter.addEventListener('change', filterEntries);
+    obsFilter.addEventListener('change', filterEntries);
+
+    // Chart functionality
+    const chartTabs = document.querySelectorAll('.chart-tab');
+    const statsChart = document.getElementById('statsChart');
+    let currentChart = null;
+
+    // Initialize Chart.js
+    function initializeCharts() {
+        if (!statsChart) return;
+        
+        // Set up click handlers for chart tabs
+        chartTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                chartTabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                updateChart(tab.dataset.chart);
+            });
+        });
+        
+        // Initial chart load
+        updateChart('distribution');
+    }
+
+    function updateChart(chartType) {
+        if (currentChart) {
+            currentChart.destroy();
+        }
+
+        fetch(`/chart_data/${chartType}`)
+            .then(response => response.json())
+            .then(data => {
+                const ctx = statsChart.getContext('2d');
+                const config = getChartConfig(chartType, data);
+                currentChart = new Chart(ctx, config);
+            });
+    }
+
+    function getChartConfig(chartType, data) {
+        const darkThemeConfig = {
+            color: '#fff',
+            grid: {
+                color: '#404040'
+            }
+        };
+
+        const configs = {
+            distribution: {
+                type: 'bar',
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        label: 'Times Landed',
+                        data: data.values,
+                        backgroundColor: '#007bff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#fff' }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { color: '#fff' },
+                            grid: darkThemeConfig.grid
+                        },
+                        x: {
+                            ticks: { color: '#fff' },
+                            grid: darkThemeConfig.grid
+                        }
+                    }
+                }
+            },
+            timeline: {
+                type: 'line',
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        label: 'Spins per Day',
+                        data: data.values,
+                        borderColor: '#007bff',
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#fff' }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { color: '#fff' },
+                            grid: darkThemeConfig.grid
+                        },
+                        x: {
+                            ticks: { color: '#fff' },
+                            grid: darkThemeConfig.grid
+                        }
+                    }
+                }
+            },
+            heatmap: {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: 'Spin Times',
+                        data: data.points,
+                        backgroundColor: '#007bff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#fff' }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            ticks: { color: '#fff' },
+                            grid: darkThemeConfig.grid,
+                            title: {
+                                display: true,
+                                text: 'Hour of Day',
+                                color: '#fff'
+                            }
+                        },
+                        x: {
+                            ticks: { color: '#fff' },
+                            grid: darkThemeConfig.grid,
+                            title: {
+                                display: true,
+                                text: 'Day of Week',
+                                color: '#fff'
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        return configs[chartType];
+    }
+
+    // Quick Actions functions
+    window.resetSpinHistory = function() {
+        if (confirm('Are you sure you want to reset the spin history? This cannot be undone.')) {
+            fetch('/reset_spin_history', { 
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('Spin history has been reset', 'success');
+                    updateSpinHistory();
+                    // Refresh the charts
+                    const activeChart = document.querySelector('.chart-tab.active');
+                    if (activeChart) {
+                        updateChart(activeChart.dataset.chart);
+                    }
+                } else {
+                    showToast('Failed to reset spin history', 'error');
+                }
+            })
+            .catch(error => {
+                showToast('Error resetting spin history', 'error');
+                console.error('Error:', error);
+            });
+        }
+    };
+
+    window.exportData = function() {
+        fetch('/export_data')
+            .then(response => response.json())
+            .then(data => {
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'wheel_data.json';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                showToast('Data exported successfully', 'success');
+            })
+            .catch(error => {
+                showToast('Error exporting data', 'error');
+                console.error('Error:', error);
+            });
+    };
+
+    window.importData = function() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+        
+        input.onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            fetch('/import_data', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('Data imported successfully', 'success');
+                    window.location.reload();
+                } else {
+                    showToast(data.error || 'Failed to import data', 'error');
+                }
+            })
+            .catch(error => {
+                showToast('Error importing data', 'error');
+                console.error('Error:', error);
+            });
+        };
+        
+        input.click();
+    };
+
+    window.backupSettings = function() {
+        fetch('/backup_settings')
+            .then(response => response.json())
+            .then(data => {
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'wheel_settings.json';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                showToast('Settings backed up successfully', 'success');
+            })
+            .catch(error => {
+                showToast('Error backing up settings', 'error');
+                console.error('Error:', error);
+            });
+    };
+
+    // Initialize spin history
+    updateSpinHistory();
+
+    // Initialize charts
+    initializeCharts();
+
+    // Initialize scripts
+    fetchAndUpdateScripts();
 });
 
 // Prevent defaults for drag and drop

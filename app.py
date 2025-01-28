@@ -4,7 +4,7 @@ eventlet.monkey_patch()
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_socketio import SocketIO, emit
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 import subprocess
 import irc.client
@@ -15,6 +15,8 @@ from obswebsocket import obsws, requests
 import obswebsocket
 from sqlalchemy import func
 import socket
+import json
+from collections import defaultdict
 
 app = Flask(__name__)
 app.secret_key = "thissecretkeyisonlyrequiredforflashingmessages"
@@ -348,6 +350,7 @@ def get_available_scripts():
     for file in os.listdir(scripts_dir):
         if file.endswith(('.py', '.js')):
             scripts.append(file)
+    print("Available scripts:", scripts)  # Add this line to log available scripts
     return sorted(scripts)
 
 def get_available_sounds():
@@ -393,6 +396,7 @@ def dashboard():
     """Render the dashboard page."""
     entries = Entry.query.all()
     settings = Settings.query.first()
+    spin_history = SpinHistory.query.order_by(SpinHistory.timestamp.desc()).all()
     
     # Calculate total weight
     total_weight = sum(entry.weight for entry in entries)
@@ -400,6 +404,9 @@ def dashboard():
     # Calculate chance percentage for each entry
     for entry in entries:
         entry.chance_percent = (entry.weight / total_weight * 100) if total_weight > 0 else 0
+    
+    # Calculate statistics
+    stats = calculate_statistics(entries, spin_history)
     
     # Get settings values, using defaults if no settings exist
     twitch_username = settings.twitch_username if settings else None
@@ -425,8 +432,45 @@ def dashboard():
         green_screen_enabled=green_screen_enabled,
         obs_host=obs_host,
         obs_port=obs_port,
-        obs_password=obs_password
+        obs_password=obs_password,
+        **stats  # Unpack statistics into template variables
     )
+
+def calculate_statistics(entries, spin_history):
+    """Calculate various statistics for the dashboard."""
+    from collections import Counter
+    from datetime import datetime, timedelta
+    
+    stats = {
+        'total_weight': sum(entry.weight for entry in entries),
+        'spins_today': 0,
+        'avg_spins_per_day': 0,
+        'most_common_result': "No spins yet",
+        'least_common_result': "No spins yet",
+        'last_spin_result': None
+    }
+    
+    if spin_history:
+        # Last spin result
+        stats['last_spin_result'] = spin_history[0].result
+        
+        # Today's spins
+        today = datetime.now().date()
+        stats['spins_today'] = sum(1 for spin in spin_history if spin.timestamp.date() == today)
+        
+        # Calculate average spins per day
+        if len(spin_history) > 1:
+            first_spin = min(spin.timestamp for spin in spin_history)
+            days_diff = (datetime.now() - first_spin).days + 1
+            stats['avg_spins_per_day'] = len(spin_history) / max(1, days_diff)
+        
+        # Most/least common results
+        result_counts = Counter(spin.result for spin in spin_history)
+        if result_counts:
+            stats['most_common_result'] = result_counts.most_common(1)[0][0]
+            stats['least_common_result'] = min(result_counts.items(), key=lambda x: x[1])[0]
+    
+    return stats
 
 @app.route('/save_initial_settings', methods=['POST'])
 def save_initial_settings():
@@ -791,8 +835,8 @@ def get_spin_history():
             })
         return jsonify(formatted_history)
     except Exception as e:
-        print(f"Error in get_spin_history: {str(e)}")  # Add debug logging
-        return jsonify({'error': str(e)}), 500
+        print(f"Error in get_spin_history: {str(e)}")  # Debug logging
+        return jsonify([])  # Return empty list instead of error
 
 @app.route('/save_spin_result', methods=['POST'])
 def save_spin_result():
@@ -937,6 +981,181 @@ def save_settings():
     except Exception as e:
         print(f"Error saving settings: {e}")  # Debug log
         return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/reset_spin_history', methods=['POST'])
+def reset_spin_history():
+    try:
+        SpinHistory.query.delete()
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/export_data')
+def export_data():
+    try:
+        # Get all entries
+        entries = Entry.query.all()
+        entries_data = [{
+            'name': entry.name,
+            'weight': entry.weight,
+            'script_name': entry.script_name,
+            'obs_action': entry.obs_action,
+            'obs_action_param': entry.obs_action_param,
+            'description': entry.description
+        } for entry in entries]
+
+        # Get spin history
+        spin_history = SpinHistory.query.all()
+        history_data = [{
+            'result': spin.result,
+            'timestamp': spin.timestamp.isoformat()
+        } for spin in spin_history]
+
+        # Get settings
+        settings = Settings.query.first()
+        settings_data = {
+            'twitch_username': settings.twitch_username,
+            'green_screen_color': settings.green_screen_color,
+            'green_screen_enabled': settings.green_screen_enabled,
+            'sub_count': settings.sub_count,
+            'sound': settings.sound,
+            'obs_host': settings.obs_host,
+            'obs_port': settings.obs_port,
+            'obs_password': settings.obs_password
+        } if settings else None
+
+        data = {
+            'entries': entries_data,
+            'spin_history': history_data,
+            'settings': settings_data
+        }
+        
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/backup_settings')
+def backup_settings():
+    try:
+        settings = Settings.query.first()
+        if settings:
+            settings_data = {
+                'twitch_username': settings.twitch_username,
+                'green_screen_color': settings.green_screen_color,
+                'green_screen_enabled': settings.green_screen_enabled,
+                'sub_count': settings.sub_count,
+                'sound': settings.sound,
+                'obs_host': settings.obs_host,
+                'obs_port': settings.obs_port,
+                'obs_password': settings.obs_password
+            }
+            return jsonify(settings_data)
+        return jsonify({})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/import_data', methods=['POST'])
+def import_data():
+    try:
+        if 'file' not in request.files:
+            return jsonify({'success': False, 'error': 'No file uploaded'}), 400
+            
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'success': False, 'error': 'No file selected'}), 400
+            
+        if not file.filename.endswith('.json'):
+            return jsonify({'success': False, 'error': 'File must be JSON format'}), 400
+            
+        data = json.loads(file.read())
+        
+        # Clear existing data
+        Entry.query.delete()
+        SpinHistory.query.delete()
+        Settings.query.delete()
+        
+        # Import entries
+        for entry_data in data.get('entries', []):
+            entry = Entry(**entry_data)
+            db.session.add(entry)
+            
+        # Import spin history
+        for history_data in data.get('spin_history', []):
+            history_data['timestamp'] = datetime.fromisoformat(history_data['timestamp'])
+            spin = SpinHistory(**history_data)
+            db.session.add(spin)
+            
+        # Import settings
+        if data.get('settings'):
+            settings = Settings(**data['settings'])
+            db.session.add(settings)
+            
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/chart_data/<chart_type>')
+def chart_data(chart_type):
+    """Get data for different chart types."""
+    spin_history = SpinHistory.query.order_by(SpinHistory.timestamp.desc()).all()
+    
+    if chart_type == 'distribution':
+        # Count occurrences of each result
+        result_counts = defaultdict(int)
+        for spin in spin_history:
+            result_counts[spin.result] += 1
+        
+        return jsonify({
+            'labels': list(result_counts.keys()),
+            'values': list(result_counts.values())
+        })
+        
+    elif chart_type == 'timeline':
+        # Group spins by day
+        daily_counts = defaultdict(int)
+        for spin in spin_history:
+            day = spin.timestamp.date()
+            daily_counts[day] += 1
+        
+        # Sort by date and format
+        sorted_days = sorted(daily_counts.keys())
+        return jsonify({
+            'labels': [day.strftime('%m/%d/%y') for day in sorted_days],
+            'values': [daily_counts[day] for day in sorted_days]
+        })
+        
+    elif chart_type == 'heatmap':
+        # Create heatmap data points
+        points = []
+        for spin in spin_history:
+            points.append({
+                'x': spin.timestamp.weekday(),  # 0-6 for Monday-Sunday
+                'y': spin.timestamp.hour,       # 0-23 for hour of day
+            })
+        
+        return jsonify({
+            'points': points
+        })
+    
+    return jsonify({'error': 'Invalid chart type'}), 400
+
+@app.route('/list_scripts')
+def list_scripts():
+    """Return a list of available scripts."""
+    try:
+        scripts_dir = os.path.join(app.root_path, 'custom_scripts')
+        scripts = []
+        if os.path.exists(scripts_dir):
+            for file in os.listdir(scripts_dir):
+                if file.endswith(('.py', '.js')):
+                    scripts.append(file)
+        print("Available scripts:", scripts)  # Add this line to log available scripts
+        return jsonify({'scripts': scripts})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     threading.Thread(target=connect_to_twitch_chat, daemon=True).start()
