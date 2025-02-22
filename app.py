@@ -18,6 +18,7 @@ import socket
 import json
 from collections import defaultdict, deque
 import time
+import re
 
 
 app = Flask(__name__)
@@ -113,6 +114,8 @@ def connect_to_twitch_chat():
     except Exception as e:
         print(f"Error connecting to Twitch chat: {e}")
 
+import re
+
 def receive_messages():
     """Receive and process messages from Twitch chat."""
     global irc, total_subs
@@ -125,35 +128,50 @@ def receive_messages():
                 reconnect_to_twitch_chat()
                 continue
 
+            # Debugging: Print all received data to inspect messages
+            print(f"Raw data received: {data}")
+
             # Handle Twitch PING/PONG to keep connection alive
             if 'PING :tmi.twitch.tv' in data:
                 irc.send('PONG :tmi.twitch.tv\r\n'.encode())
                 continue
 
-            # Process Streamlabs subscription notifications
+            # Process normal chat messages (PRIVMSG)
             if "PRIVMSG" in data:
                 try:
-                    # Extract username and message
-                    username = data.split('!')[0][1:]
+                    # Correctly extract username using regex
+                    match = re.search(r":(\w+)!\w+@\w+\.tmi\.twitch\.tv PRIVMSG", data)
+                    if match:
+                        username = match.group(1)
+                    else:
+                        print("Failed to extract username")
+                        continue
+
+                    # Extract message
                     message = data.split('PRIVMSG')[1].split(':', 1)[1].strip()
 
-                    # Only process Streamlabs messages
+                    # Debugging: Show extracted values
+                    print(f"Username extracted: {username}, Message received: {message}")
+
+                    # Check if message is from Streamlabs (Case-insensitive)
                     if username.lower() == "streamlabs":
                         if "just subscribed with" in message.lower():
+                            print("✅ Detected a new subscription! Adding to queue.")
                             queue_subscription(1)
 
                         elif "just gifted" in message.lower() and "tier 1 subscriptions" in message.lower():
                             try:
                                 amount = int(message.split("just gifted")[1].split("Tier 1")[0].strip())
+                                print(f"✅ Detected gifted subs: {amount} Adding to queue.")
                                 queue_subscription(amount)
                             except (ValueError, IndexError):
-                                print("Error parsing gifted subscription message.")
+                                print("⚠ Error parsing gifted subscription message.")
 
                 except Exception as e:
-                    print(f"Error processing message: {e}")
+                    print(f"⚠ Error processing message: {e}")
 
         except Exception as e:
-            print(f"Error receiving message: {e}")
+            print(f"⚠ Error receiving message: {e}")
             reconnect_to_twitch_chat()
             continue
 
