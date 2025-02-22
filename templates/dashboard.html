@@ -176,9 +176,11 @@
             </div>
             <div id="trigger-section">
                 <button id="trigger-spin-btn" {% if not entries %}disabled{% endif %}>
-                    {% if not entries %}No Entries Available{% else %}Trigger Spin{% endif %}
+                  {% if not entries %}No Entries Available{% else %}Trigger Spin{% endif %}
                 </button>
-            </div>
+                <button id="toggle-pause-btn" class="pause">Pause</button>
+              </div>
+
             <div id="initial-settings-modal" class="modal {% if is_first_time %}modal-show{% endif %}">
                 <div class="modal-content">
                     <h2>Initial Setup</h2>

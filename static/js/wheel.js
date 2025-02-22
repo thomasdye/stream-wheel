@@ -158,13 +158,15 @@ async function populateWheel() {
 
 // Reset inactivity timeout
 function resetInactivityTimer() {
-    // Always hide the overlay immediately
+    // Hide overlay immediately
     inactivityOverlay.style.display = 'none';
 
-    // Clear the previous timeout
-    clearTimeout(inactivityTimeout);
+    // Prevent redundant calls by clearing the previous timeout
+    if (inactivityTimeout) {
+        clearTimeout(inactivityTimeout);
+    }
 
-    // Only set up new timeout if green screen is enabled and wheel is not spinning
+    // Ensure we only set the timeout if green screen is enabled and the wheel is not spinning
     if (greenScreenEnabled && !spinning) {
         console.log("Setting up inactivity timer"); // Debug log
         inactivityTimeout = setTimeout(() => {
@@ -172,16 +174,27 @@ function resetInactivityTimer() {
             if (greenScreenEnabled && !spinning) {
                 inactivityOverlay.style.display = 'block';
             }
-        }, 10000); // 10 seconds
+        }, 10000);
     } else {
-        console.log("Green screen disabled or wheel spinning - not setting timer"); // Debug log
+        console.log("Green screen disabled or wheel spinning - not setting timer");
     }
 }
 
+
 // Add event listeners for user interactions
+let inactivityTimerRunning = false;
 ['mousemove', 'mousedown', 'keypress', 'scroll', 'touchstart'].forEach(event => {
-    document.addEventListener(event, resetInactivityTimer);
+    document.addEventListener(event, () => {
+        if (!inactivityTimerRunning) {
+            inactivityTimerRunning = true;
+            setTimeout(() => {
+                resetInactivityTimer();
+                inactivityTimerRunning = false;
+            }, 500); // Throttle calls to once every 500ms
+        }
+    });
 });
+
 
 // Initialize inactivity timer on page load
 resetInactivityTimer();
@@ -486,6 +499,7 @@ socket.on("spin_started", () => {
 socket.on("spin_completed", () => {
     console.log("Spin completed. Enabling the spin button.");
     if (triggerSpinBtn) triggerSpinBtn.disabled = false;
+    resetInactivityTimer();
 });
 
 socket.on("sub_count_updated", (data) => {

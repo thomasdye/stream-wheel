@@ -241,6 +241,43 @@ document.addEventListener("DOMContentLoaded", () => {
         return `${hours}:${formattedMinutes}${ampm}`;
     }
 
+    const togglePauseBtn = document.getElementById("toggle-pause-btn");
+    if (togglePauseBtn) {
+        togglePauseBtn.addEventListener("click", function() {
+            // Determine the action based on current state
+            const currentlyPaused = this.dataset.paused === "true";
+            const action = currentlyPaused ? "resume" : "pause";
+
+            fetch('/toggle_sub_pause', {
+                method: 'POST',
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: action })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.paused) {
+                    // Processing is paused, so button should show "Resume" in green
+                    this.textContent = "Resume";
+                    this.dataset.paused = "true";
+                    this.classList.remove("pause");
+                    this.classList.add("resume");
+                    showToast("Subscription processing paused", "info");
+                } else {
+                    // Processing resumed, so button should show "Pause" in red
+                    this.textContent = "Pause";
+                    this.dataset.paused = "false";
+                    this.classList.remove("resume");
+                    this.classList.add("pause");
+                    showToast("Subscription processing resumed", "success");
+                }
+            })
+            .catch(err => {
+                console.error("Error toggling subscription pause state:", err);
+                showToast("Error toggling pause", "error");
+            });
+        });
+    }
+
     // Modal functions
     function openModal() {
         addEntryModal.classList.add('show');

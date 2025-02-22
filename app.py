@@ -16,7 +16,9 @@ import obswebsocket
 from sqlalchemy import func
 import socket
 import json
-from collections import defaultdict
+from collections import defaultdict, deque
+import time
+
 
 app = Flask(__name__)
 app.secret_key = "thissecretkeyisonlyrequiredforflashingmessages"
@@ -30,6 +32,10 @@ db = SQLAlchemy(app)
 socketio = SocketIO(app)
 
 sub_count = 0
+
+subscription_queue = deque()
+processing_subs = False
+subscription_paused = False
 
 # Models
 class Entry(db.Model):
@@ -134,22 +140,12 @@ def receive_messages():
                     # Only process Streamlabs messages
                     if username.lower() == "streamlabs":
                         if "just subscribed with" in message.lower():
-                            total_subs += 1
-                            print(f"New subscription detected! Total subs: {total_subs}")
-                            with app.app_context():
-                                sub_count = Settings.query.first().sub_count
-                            check_and_spin_wheel()
-                            socketio.emit("sub_count_updated", {"current_subs": total_subs, "total_subs": sub_count})
+                            queue_subscription(1)
 
                         elif "just gifted" in message.lower() and "tier 1 subscriptions" in message.lower():
                             try:
                                 amount = int(message.split("just gifted")[1].split("Tier 1")[0].strip())
-                                total_subs += amount
-                                print(f"{amount} gifted subscriptions detected! Total subs: {total_subs}")
-                                with app.app_context():
-                                    sub_count = Settings.query.first().sub_count
-                                check_and_spin_wheel()
-                                socketio.emit("sub_count_updated", {"current_subs": total_subs, "total_subs": sub_count})
+                                queue_subscription(amount)
                             except (ValueError, IndexError):
                                 print("Error parsing gifted subscription message.")
 
@@ -158,9 +154,46 @@ def receive_messages():
 
         except Exception as e:
             print(f"Error receiving message: {e}")
-            # Attempt to reconnect on error
             reconnect_to_twitch_chat()
             continue
+
+def queue_subscription(amount):
+    """Add the gifted subscriptions to the queue and start processing if not already running."""
+    global processing_subs
+
+    for _ in range(amount):
+        subscription_queue.append(1)  # Each subscription is a single unit
+
+    print(f"Queued {amount} subs. Queue size: {len(subscription_queue)}")
+
+    if not processing_subs:
+        threading.Thread(target=process_subscription_queue, daemon=True).start()
+
+def process_subscription_queue():
+    """Process the queued gifted subscriptions every 30 seconds."""
+    global processing_subs, total_subs, subscription_paused
+
+    processing_subs = True
+
+    while subscription_queue:
+        # Wait while processing is paused
+        while subscription_paused:
+            time.sleep(1)
+
+        sub = subscription_queue.popleft()  # Take one sub from the queue
+        total_subs += sub
+        print(f"Processing a sub. Remaining in queue: {len(subscription_queue)}. Total subs: {total_subs}")
+
+        # Emit update to front-end
+        with app.app_context():
+            sub_count = Settings.query.first().sub_count
+            check_and_spin_wheel()
+            socketio.emit("sub_count_updated", {"current_subs": total_subs, "total_subs": sub_count})
+
+        # Wait 30 seconds before processing the next sub
+        time.sleep(30)
+
+    processing_subs = False  # Queue is empty, stop processing
 
 def reconnect_to_twitch_chat():
     """Reconnect to Twitch chat with updated username."""
@@ -500,6 +533,14 @@ def save_initial_settings():
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
+    
+@app.route('/test_queue_subs', methods=['POST'])
+def test_queue_subs():
+    """Test endpoint to simulate gifted subs."""
+    data = request.get_json()
+    amount = int(data.get("amount", 1))
+    queue_subscription(amount)
+    return jsonify({"message": f"Queued {amount} test subs"}), 200
 
 @app.route('/wheel')
 def wheel():
@@ -863,6 +904,22 @@ def save_spin_result():
 def run_script(script_name):
     execute_script(script_name)
     return "Script executed!", 200
+
+@app.route('/toggle_sub_pause', methods=['POST'])
+def toggle_sub_pause():
+    global subscription_paused
+    data = request.get_json()
+    action = data.get("action", "").lower()
+    
+    if action == "pause":
+        subscription_paused = True
+    elif action == "resume":
+        subscription_paused = False
+    else:
+        return jsonify({"error": "Invalid action"}), 400
+        
+    print(f"Subscription processing paused: {subscription_paused}")
+    return jsonify({"paused": subscription_paused})
     
 # Ensure databases are initialized
 with app.app_context():
