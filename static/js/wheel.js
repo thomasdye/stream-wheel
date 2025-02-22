@@ -464,30 +464,69 @@ function sendObsActionRequest(bodyData) {
 
 document.addEventListener("DOMContentLoaded", () => {
     const subCountDisplay = document.getElementById("sub-count-display");
+    const subQueueDisplay = document.getElementById("sub-queue-display");
+    const subTimerDisplay = document.getElementById("sub-timer-display");
 
-    // Update subscription count
-    function updateSubCount(current, total) {
+    let nextSubTime = null; // Stores the exact time when the next sub will happen
+    let countdownInterval = null; // Stores the interval ID
+
+    function updateSubCount(current, total, queue) {
         subCountDisplay.textContent = `${current} / ${total}`;
+        subQueueDisplay.textContent = queue;
     }
 
-    // Fetch subscription count on page load
+    function startCountdownTimer() {
+        console.log(`Next sub in: ${new Date(nextSubTime)} | Now: ${new Date()}`);
+
+        if (!nextSubTime) return;
+
+        // Clear any previous interval to prevent multiple timers running
+        if (countdownInterval) clearInterval(countdownInterval);
+
+        countdownInterval = setInterval(() => {
+            const now = Date.now();
+            const timeLeft = Math.max(0, Math.floor((nextSubTime - now) / 1000)); // Convert to seconds
+
+            const minutes = String(Math.floor(timeLeft / 60)).padStart(2, '0');
+            const seconds = String(timeLeft % 60).padStart(2, '0');
+            subTimerDisplay.textContent = `${minutes}:${seconds}`;
+
+            if (timeLeft <= 0) {
+                clearInterval(countdownInterval);
+                subTimerDisplay.textContent = "00:00"; // Reset timer when it reaches zero
+            }
+        }, 1000);
+    }
+
     async function fetchSubCount() {
         try {
             const response = await fetch('/sub_count');
             if (!response.ok) throw new Error("Failed to fetch sub count");
             const data = await response.json();
-            updateSubCount(data.current_subs, data.total_subs);
+    
+            updateSubCount(data.current_subs, data.total_subs, data.queue_size);
+    
+            if (data.next_sub_time) {
+                nextSubTime = data.next_sub_time * 1000; // Convert UNIX timestamp (seconds) to milliseconds
+                console.log(`Converted nextSubTime: ${new Date(nextSubTime)}`); // Debugging
+                startCountdownTimer();
+            }
         } catch (error) {
             console.error("Error fetching sub count:", error);
         }
     }
 
-    // WebSocket listener for sub count updates
-    socket.on("sub_count_updated", ({ current_subs, total_subs }) => {
-        updateSubCount(current_subs, total_subs);
+    socket.on("sub_count_updated", ({ current_subs, total_subs, queue_size, next_sub_time }) => {
+        updateSubCount(current_subs, total_subs, queue_size);
+    
+        if (next_sub_time) {
+            nextSubTime = next_sub_time * 1000; // Convert UNIX timestamp (seconds) to milliseconds
+            console.log(`Converted nextSubTime: ${new Date(nextSubTime)}`); // Debugging
+            startCountdownTimer();
+        }
     });
 
-    fetchSubCount(); // Initial fetch
+    fetchSubCount(); // Fetch subscription count on page load
 });
 
 socket.on("spin_started", () => {

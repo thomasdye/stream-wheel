@@ -1,53 +1,66 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Spin the Wheel</title>
-    <link rel="stylesheet" href="static/css/wheel.css">
-    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
-</head>
-<body>
-    <div id="main-container">
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <title>Spin the Wheel</title>
+        <link rel="stylesheet" href="static/css/wheel.css">
+        <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    </head>
+    <body>
+        <div id="main-container">
+            <div id="result-modal">
+                <div id="result-content">
+                    <h2 id="modal-title"></h2>
+                    <p id="modal-description"></p> 
+                    <p id="modal-chance"></p>
+                </div>
+            </div>
 
-        <div id="result-modal">
-            <div id="result-content">
-                <h2 id="modal-title"></h2>
-                <p id="modal-description"></p> 
-                <p id="modal-chance"></p>
+            <div id="key">
+                <h2>Key</h2>
+                <ul id="key-list"></ul>
+            </div>
+
+            <div id="center-container">
+                <h1>{{ twitch_username }}'s Wheel</h1>
+                <div id="wheel-container">
+                    <div id="indicator"></div>
+                    <canvas id="wheel" width="800" height="800"></canvas>
+                </div>
+            </div>
+
+            <div id="spin-history">
+                <h2>Spin History</h2>
+                <ul id="spin-history-list"></ul>
             </div>
         </div>
 
-        <div id="key">
-            <h2>Key</h2>
-            <ul id="key-list"></ul>
-        </div>
-        <div id="center-container">
-            <h1>{{ twitch_username }}'s Wheel</h1>
-            <div id="wheel-container">
-                <div id="indicator"></div>
-                <canvas id="wheel" width="800" height="800"></canvas>
+        <div id="sub-count-container">
+            <div class="sub-queue">
+                <p class="label">Subscribers in Queue</p>
+                <p id="sub-queue-display" class="sub-value">0</p>
             </div>
+    
+            <div class="sub-timer">
+                <p class="label">Next Sub In</p>
+                <p id="sub-timer-display" class="sub-value">00:00</p>
+            </div>
+    
+            <div class="sub-total">
+                <p class="label">Subs Until Next Spin</p>
+                <p id="sub-count-display" class="sub-value">0 / 0</p>
+            </div>
+        </div>          
+
+        <audio id="spin-sound" src="/custom_sounds/{{ selected_sound }}" preload="auto"></audio>
+
+        <div id="inactivity-overlay" 
+            data-color="{{ green_screen_color | default('#00FF00') }}"
+            data-enabled="{{ 'true' if green_screen_enabled else 'false' }}">
         </div>
-        <div id="spin-history">
-            <h2>Spin History</h2>
-            <ul id="spin-history-list"></ul>
-        </div>
-    </div>
 
-    <div id="sub-count-container">
-        <p class="label">Subs Until Next Spin</p>
-        <p id="sub-count-display" class="count">0 / 0</p>
-    </div>
-
-    <audio id="spin-sound" src="/custom_sounds/{{ selected_sound }}" preload="auto"></audio>
-
-    <div id="inactivity-overlay" 
-         data-color="{{ green_screen_color | default('#00FF00') }}"
-         data-enabled="{{ 'true' if green_screen_enabled else 'false' }}">
-    </div>
-
-    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
-    <script src="static/js/wheel.js"></script>
-</body>
-</html>
+        <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+        <script src="static/js/wheel.js"></script>
+    </body>
+    </html>

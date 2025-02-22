@@ -110,6 +110,7 @@ body {
     flex-direction: column;
     align-items: center;
     text-align: center;
+    margin-top: -200px; /* Moves the wheel and title up */
 }
 
 canvas {
@@ -179,19 +180,9 @@ canvas {
     transform-origin: center;
 }
 
-#sub-count-display {
-    position: fixed;
-    bottom: 40px;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 72px;
-    font-weight: bold;
-    text-align: center;
-}
-
 #sub-count-container {
     position: fixed;
-    bottom: 40px;
+    bottom: 60px;
     left: 50%;
     transform: translateX(-50%);
     text-align: center;
@@ -199,6 +190,60 @@ canvas {
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 5px;
+}
+
+.sub-queue, .sub-timer, .sub-total {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* LABELS */
+.label {
+    font-size: 20px;
+    font-weight: bold;
+    color: #bbbbbb;
+    margin-bottom: 3px;
+}
+
+/* VALUES */
+.sub-value {
+    font-size: 32px;
+    font-weight: bold;
+    color: #ffffff;
+}
+
+#sub-timer-display {
+    font-size: 20px !important;
+    font-weight: bold;
+    color: #ffcc00;
+}
+
+#sub-count-display {
+    font-size: 72px;
+    font-weight: bold;
+    color: #ffffff;
+    margin-top: -10px; /* Moves the total count up */
+}
+
+#sub-queue-display {
+    font-size: 30px !important;
+    margin-top: -5px; /* Moves the number closer to the label */
+}
+
+#sub-timer-display {
+    font-size: 40px;
+    font-weight: bold;
+    color: #ffcc00;
+    margin-top: -15px; /* Moves the timer up */
+}
+
+#sub-count-container .small-label {
+    font-size: 18px;
+    font-weight: bold;
+    color: #bbbbbb;
+    margin-bottom: 2px;
 }
 
 #sub-count-container p {

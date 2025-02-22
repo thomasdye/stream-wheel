@@ -188,7 +188,14 @@ def process_subscription_queue():
         with app.app_context():
             sub_count = Settings.query.first().sub_count
             check_and_spin_wheel()
-            socketio.emit("sub_count_updated", {"current_subs": total_subs, "total_subs": sub_count})
+            # Emit update with next sub time
+            next_sub_time = int(time.time()) + 30  # 30 seconds from now
+            socketio.emit("sub_count_updated", {
+                "current_subs": total_subs,
+                "total_subs": Settings.query.first().sub_count,
+                "queue_size": len(subscription_queue),
+                "next_sub_time": next_sub_time
+            })
 
         # Wait 30 seconds before processing the next sub
         time.sleep(30)
@@ -817,11 +824,24 @@ def custom_sounds(filename):
 
 @app.route('/sub_count', methods=['GET'])
 def sub_count():
-    """Return the current and total subscription count."""
-    global total_subs
+    """Return the current and total subscription count, including the queue size and next sub time."""
+    global total_subs, subscription_queue
+
     setting = Settings.query.first()
     sub_count = setting.sub_count if setting else 3
-    return jsonify({"current_subs": total_subs, "total_subs": sub_count})
+    queue_size = len(subscription_queue)
+
+    # Estimate when the next subscriber will be processed (30s per sub)
+    next_sub_time = None
+    if queue_size > 0:
+        next_sub_time = int(time.time()) + 30  # Next sub will be processed in 30 seconds
+
+    return jsonify({
+        "current_subs": total_subs,
+        "total_subs": sub_count,
+        "queue_size": queue_size,
+        "next_sub_time": next_sub_time
+    })
 
 @app.route('/spin', methods=['GET'])
 def spin():
