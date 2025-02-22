@@ -130,7 +130,9 @@ function fetchAndUpdateScripts() {
         .then(data => {
             if (data.scripts) {
                 updateScriptDropdown(data.scripts);
-                updateEditDropdowns(data.scripts);
+                setTimeout(() => {
+                    updateEditDropdowns(data.scripts);
+                }, 1000);
             }
         })
         .catch(error => {
@@ -140,15 +142,29 @@ function fetchAndUpdateScripts() {
 
 // Function to update the script dropdowns in edit mode
 function updateEditDropdowns(scripts) {
-    const editEntries = document.querySelectorAll('.edit-mode'); // Select all edit mode sections
+    console.log('Updating edit dropdowns with:', scripts);
 
-    editEntries.forEach(entry => {
-        const dropdown = entry.querySelector('.edit-script'); // Get the specific dropdown for this entry
-        const currentScript = entry.querySelector('.view-field:nth-child(3)').textContent; // Get the current script from the view mode
+    document.querySelectorAll('.edit-mode').forEach(entry => {
+        const dropdown = entry.querySelector('.edit-script');
+        if (!dropdown) {
+            console.error('Dropdown not found in edit mode:', entry);
+            return;
+        }
 
-        console.log('Current Script:', currentScript); // Debugging line
+        // Get current script from view mode
+        const currentScriptElement = entry.previousElementSibling?.querySelector('.view-field:nth-child(3)');
+        if (!currentScriptElement) {
+            console.error('Could not find current script element for entry:', entry);
+            return;
+        }
+        const currentScript = currentScriptElement.textContent.trim();
 
-        dropdown.innerHTML = '<option value="">None</option>'; // Reset options
+        console.log(`Entry script: "${currentScript}"`);
+
+        // Clear dropdown
+        dropdown.innerHTML = '<option value="">None</option>'; 
+
+        // Populate dropdown
         scripts.forEach(script => {
             const option = document.createElement('option');
             option.value = script;
@@ -156,10 +172,10 @@ function updateEditDropdowns(scripts) {
             dropdown.appendChild(option);
         });
 
-        // Set the dropdown value to the current script if it exists
-        if (currentScript) {
-            dropdown.value = currentScript === "None" ? "" : currentScript; // Set to "" if "None" is selected
-        }
+        // Set correct value
+        dropdown.value = scripts.includes(currentScript) ? currentScript : "";
+
+        console.log(`Dropdown updated. Set value: "${dropdown.value}"`);
     });
 }
 
@@ -391,14 +407,20 @@ document.addEventListener("DOMContentLoaded", () => {
             const editMode = li.querySelector('.edit-mode');
     
             if (isEditMode) {
-                viewMode.style.display = 'none'; // Hide view mode
-                editMode.style.display = 'contents'; // Show edit mode
+                viewMode.style.display = 'none';
+                editMode.style.display = 'contents';
             } else {
-                viewMode.style.display = 'contents'; // Show view mode
-                editMode.style.display = 'none'; // Hide edit mode
+                viewMode.style.display = 'contents';
+                editMode.style.display = 'none';
             }
         });
-    };    
+    
+        if (isEditMode) {
+            console.log("Edit mode enabled, fetching scripts...");
+            fetchAndUpdateScripts();
+        }
+    };
+        
 
     // Make functions globally available
     window.saveEntry = function(entryId) {
